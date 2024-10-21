@@ -1,0 +1,51 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+android {
+    namespace = "com.example.track_tag"
+    compileSdkVersion 34
+    ndkVersion "23.1.7779620"
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+
+    defaultConfig {
+        applicationId = "com.example.track_tag"
+        minSdkVersion 21  // Minimum SDK version for the app
+        targetSdkVersion 34  // Target Android version
+        versionCode flutter.versionCode.toInteger()  // Flutter versionCode
+        versionName flutter.versionName  // Flutter versionName
+    }
+
+    signingConfigs {
+        release {
+           release {
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+            storeFile file(keystoreProperties['storeFile'])
+            storePassword keystoreProperties['storePassword']
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}}
+
+flutter {
+    source = "../.."
+}
