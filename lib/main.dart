@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 // // import 'package:flutter/material.dart';
 // // import 'package:track_tag/my_home_page.dart'; // Import the new file
 // // import 'register_page.dart';
@@ -26,7 +25,6 @@
 // //   }
 // // }
 
-
 // import 'package:flutter/material.dart';
 // import 'package:track_tag/login_page.dart';
 // import 'package:track_tag/register_page.dart';
@@ -51,15 +49,10 @@
 //   }
 // }
 
-
 import 'package:flutter/material.dart';
 import 'package:track_tag/login_page.dart';
 import 'package:track_tag/register_page.dart';
 import 'package:track_tag/scanner/ScanDevicePage.dart';
-=======
-import 'package:flutter/material.dart';
-import 'screens/home_screen.dart';
->>>>>>> bfdcf4b52458ab3d3c0a34d97bb7289bd512a6e9
 
 void main() {
   runApp(MyApp());
@@ -69,7 +62,6 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-<<<<<<< HEAD
       title: 'Device Scanner App',
       initialRoute: '/',
       routes: {
@@ -77,13 +69,6 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginPage(), // Your login page
         '/': (context) => const ScanDevicePage(),
       },
-=======
-      title: 'Flutter Blue Plus',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: HomeScreen(),
->>>>>>> bfdcf4b52458ab3d3c0a34d97bb7289bd512a6e9
     );
   }
 }

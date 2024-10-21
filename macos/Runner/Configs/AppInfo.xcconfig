@@ -5,17 +5,10 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-<<<<<<< HEAD
 PRODUCT_NAME = track_tag
 
 // The application's bundle identifier
 PRODUCT_BUNDLE_IDENTIFIER = com.example.trackTag
-=======
-PRODUCT_NAME = tracktag
-
-// The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.tracktag
->>>>>>> bfdcf4b52458ab3d3c0a34d97bb7289bd512a6e9
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2024 com.example. All rights reserved.

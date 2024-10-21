@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 # track_tag
-=======
-# tracktag
->>>>>>> bfdcf4b52458ab3d3c0a34d97bb7289bd512a6e9
 
 A new Flutter project.
 

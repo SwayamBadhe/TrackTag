@@ -3,7 +3,6 @@
 <plist version="1.0">
 <dict>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-<<<<<<< HEAD
 	<string>We need access to Bluetooth to connect to devices.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>Bluetooth access is required for connecting to nearby devices.</string>
@@ -14,15 +13,6 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>Track Tag</string>
-=======
-<string>This app needs Bluetooth to function</string>
-
-
-	<key>CFBundleDevelopmentRegion</key>
-	<string>$(DEVELOPMENT_LANGUAGE)</string>
-	<key>CFBundleDisplayName</key>
-	<string>Tracktag</string>
->>>>>>> bfdcf4b52458ab3d3c0a34d97bb7289bd512a6e9
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -30,11 +20,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-<<<<<<< HEAD
 	<string>track_tag</string>
-=======
-	<string>tracktag</string>
->>>>>>> bfdcf4b52458ab3d3c0a34d97bb7289bd512a6e9
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
