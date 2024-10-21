@@ -1,7 +1,14 @@
+<<<<<<< HEAD
 name: track_tag
 description: 'A new Flutter project.'
 # The following line prevents the package from being accidentally published to
 # pub.dev using flutter pub publish. This is preferred for private packages.
+=======
+name: tracktag
+description: "A new Flutter project."
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+>>>>>>> bfdcf4b52458ab3d3c0a34d97bb7289bd512a6e9
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
 # The following defines the version and build number for your application.
@@ -19,6 +26,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
+<<<<<<< HEAD
   sdk: ^3.5.2
 
 # Dependencies specify other packages that your package needs in order to work.
@@ -27,10 +35,21 @@ environment:
 # dependencies can be manually updated by changing the version numbers below to
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run flutter pub outdated.
+=======
+  sdk: ^3.5.3
+
+# Dependencies specify other packages that your package needs in order to work.
+# To automatically upgrade your package dependencies to the latest versions
+# consider running `flutter pub upgrade --major-versions`. Alternatively,
+# dependencies can be manually updated by changing the version numbers below to
+# the latest version available on pub.dev. To see which dependencies have newer
+# versions available, run `flutter pub outdated`.
+>>>>>>> bfdcf4b52458ab3d3c0a34d97bb7289bd512a6e9
 dependencies:
   flutter:
     sdk: flutter
 
+<<<<<<< HEAD
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
@@ -38,6 +57,13 @@ dependencies:
   get: ^4.6.1
   permission_handler: ^11.3.1
   mobile_scanner: ^5.0.0
+=======
+
+  # The following adds the Cupertino Icons font to your application.
+  # Use with the CupertinoIcons class for iOS style icons.
+  cupertino_icons: ^1.0.8
+  flutter_blue_plus: ^1.32.12
+>>>>>>> bfdcf4b52458ab3d3c0a34d97bb7289bd512a6e9
 
 dev_dependencies:
   flutter_test:
@@ -45,7 +71,11 @@ dev_dependencies:
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
+<<<<<<< HEAD
   # activated in the analysis_options.yaml file located at the root of your
+=======
+  # activated in the `analysis_options.yaml` file located at the root of your
+>>>>>>> bfdcf4b52458ab3d3c0a34d97bb7289bd512a6e9
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^4.0.0
@@ -55,6 +85,10 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+<<<<<<< HEAD
+=======
+
+>>>>>>> bfdcf4b52458ab3d3c0a34d97bb7289bd512a6e9
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.

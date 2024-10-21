@@ -1,5 +1,8 @@
 pluginManagement {
+<<<<<<< HEAD
     // Define the Flutter SDK path
+=======
+>>>>>>> bfdcf4b52458ab3d3c0a34d97bb7289bd512a6e9
     def flutterSdkPath = {
         def properties = new Properties()
         file("local.properties").withInputStream { properties.load(it) }
@@ -8,10 +11,15 @@ pluginManagement {
         return flutterSdkPath
     }()
 
+<<<<<<< HEAD
     // Include the Flutter tools Gradle build
     includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
     // Define plugin repositories
+=======
+    includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+
+>>>>>>> bfdcf4b52458ab3d3c0a34d97bb7289bd512a6e9
     repositories {
         google()
         mavenCentral()
@@ -19,12 +27,18 @@ pluginManagement {
     }
 }
 
+<<<<<<< HEAD
 // Define plugins and their versions
+=======
+>>>>>>> bfdcf4b52458ab3d3c0a34d97bb7289bd512a6e9
 plugins {
     id "dev.flutter.flutter-plugin-loader" version "1.0.0"
     id "com.android.application" version "8.1.0" apply false
     id "org.jetbrains.kotlin.android" version "1.8.22" apply false
 }
 
+<<<<<<< HEAD
 // Include the app module
+=======
+>>>>>>> bfdcf4b52458ab3d3c0a34d97bb7289bd512a6e9
 include ":app"

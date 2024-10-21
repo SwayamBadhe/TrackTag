@@ -1,10 +1,18 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
+<<<<<<< HEAD
 project(track_tag LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
 set(BINARY_NAME "track_tag")
+=======
+project(tracktag LANGUAGES CXX)
+
+# The name of the executable created for the application. Change this to change
+# the on-disk name of your application.
+set(BINARY_NAME "tracktag")
+>>>>>>> bfdcf4b52458ab3d3c0a34d97bb7289bd512a6e9
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.

@@ -27,7 +27,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
+<<<<<<< HEAD
   if (!window.Create(L"track_tag", origin, size)) {
+=======
+  if (!window.Create(L"tracktag", origin, size)) {
+>>>>>>> bfdcf4b52458ab3d3c0a34d97bb7289bd512a6e9
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);

@@ -1,4 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<<<<<<< HEAD
     
 <uses-permission android:name="android.permission.BLUETOOTH" />
 <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
@@ -11,6 +12,15 @@
 
     <application
         android:label="track_tag"
+=======
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+
+    <application
+        android:label="tracktag"
+>>>>>>> bfdcf4b52458ab3d3c0a34d97bb7289bd512a6e9
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

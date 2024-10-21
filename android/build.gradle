@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // Top-level build.gradle
 buildscript {
     repositories {
@@ -10,6 +11,8 @@ buildscript {
     }
 }
 
+=======
+>>>>>>> bfdcf4b52458ab3d3c0a34d97bb7289bd512a6e9
 allprojects {
     repositories {
         google()
@@ -17,8 +20,11 @@ allprojects {
     }
 }
 
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> bfdcf4b52458ab3d3c0a34d97bb7289bd512a6e9
 rootProject.buildDir = "../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
