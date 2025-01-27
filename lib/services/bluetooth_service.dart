@@ -1,39 +1,58 @@
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import '../models/bluetooth_device_model.dart';
+import 'dart:async';
 
-// Renamed to avoid conflict with BluetoothService in flutter_blue_plus
-class CustomBluetoothService {
-  // No need to create an instance of FlutterBluePlus
-  // All access will be static
+import 'package:flutter/material.dart';
+import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 
-  // Start scanning for BLE devices
-  Stream<List<BluetoothDeviceModel>> scanForDevices() async* {
-    await FlutterBluePlus.startScan(timeout: Duration(seconds: 10));
+class BluetoothService extends ChangeNotifier {
+  final FlutterReactiveBle _ble = FlutterReactiveBle();
+  late DiscoveredDevice _connectedDevice;
 
-    // Collect scan results as they come in
-    await for (var scanResults in FlutterBluePlus.scanResults) {
-      final devices = scanResults.map((result) {
-        return BluetoothDeviceModel.fromScanResult(result);
-      }).toList();
-      yield devices;
-    }
+  List<DiscoveredDevice> devices = [];
+  bool isScanning = false;
 
-    // Stop scanning after the duration ends
-    await FlutterBluePlus.stopScan();
+  StreamSubscription? _scanSubscription;
+  StreamSubscription? _connectionSubscription;
+
+  get connectedDeviceId => null;
+
+  void startScan() {
+    if (isScanning) return;
+
+    isScanning = true;
+    devices = [];
+    notifyListeners();
+
+    _scanSubscription = _ble.scanForDevices(withServices: []).listen((device) {
+      if (devices.every((d) => d.id != device.id)) {
+        devices.add(device);
+        notifyListeners();
+      }
+    }, onDone: stopScan);
   }
 
-  // Connect to a BLE device
-  Future<void> connectToDevice(BluetoothDevice device) async {
-    await device.connect(autoConnect: false);
+  void stopScan() {
+    _scanSubscription?.cancel();
+    isScanning = false;
+    notifyListeners();
   }
 
-  // Disconnect from a BLE device
-  Future<void> disconnectFromDevice(BluetoothDevice device) async {
-    await device.disconnect();
+  Future<void> connectToDevice(String deviceId) async {
+    _connectionSubscription = _ble.connectToDevice(id: deviceId).listen((connectionState) {
+      if (connectionState.connectionState == DeviceConnectionState.connected) {
+        _connectedDevice = devices.firstWhere((d) => d.id == deviceId);
+        notifyListeners();
+      }
+    }, onError: (error) {
+      print("Connection error: $error");
+    });
   }
 
-  // Discover services offered by a device
-  Future<List<BluetoothService>> discoverServices(BluetoothDevice device) async {
-    return await device.discoverServices();
+  Future<void> disconnectDevice() async {
+    _connectionSubscription?.cancel();
+    notifyListeners();
   }
+
+  void startScanning() {}
+
+  void stopScanning() {}
 }
