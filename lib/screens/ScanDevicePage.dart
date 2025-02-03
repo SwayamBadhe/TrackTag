@@ -7,7 +7,7 @@ import 'package:track_tag/screens/homepage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ScanDevicePage extends StatefulWidget {
-  const ScanDevicePage({Key? key}) : super(key: key);
+  const ScanDevicePage({super.key});
 
   @override
   _ScanDevicePageState createState() => _ScanDevicePageState();
@@ -96,10 +96,10 @@ class _ScanDevicePageState extends State<ScanDevicePage> {
         // await prefs.setString('device_id', deviceId);
         List<String> deviceIds = prefs.getStringList('device_ids') ?? [];
 
-      if (!deviceIds.contains(deviceId)) {
-        deviceIds.add(deviceId); // Add the new device ID
-        await prefs.setStringList('device_ids', deviceIds);
-      }
+        if (!deviceIds.contains(deviceId)) {
+          deviceIds.add(deviceId); // Add the new device ID
+          await prefs.setStringList('device_ids', deviceIds);
+        }
 
         // Notify the user and navigate to the HomePage
         ScaffoldMessenger.of(context).showSnackBar(
@@ -107,7 +107,8 @@ class _ScanDevicePageState extends State<ScanDevicePage> {
         );
 
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => HomePage(devices: [deviceId])),
+          MaterialPageRoute(
+              builder: (context) => HomePage(devices: [deviceId])),
         );
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -131,7 +131,6 @@
 //   }
 // }
 
-
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -141,10 +140,10 @@ class MenuPage extends StatefulWidget {
   final String profilePhotoUrl;
 
   const MenuPage({
-    Key? key,
+    super.key,
     required this.userEmail,
     required this.profilePhotoUrl,
-  }) : super(key: key);
+  });
 
   @override
   State<MenuPage> createState() => _MenuPageState();
@@ -238,7 +237,8 @@ class _MenuPageState extends State<MenuPage> {
               const SizedBox(height: 10),
               Text(
                 widget.userEmail,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -266,7 +266,8 @@ class _MenuPageState extends State<MenuPage> {
                 context: context,
                 builder: (context) => AlertDialog(
                   title: const Text('Contact Us'),
-                  content: const Text('Email: support@example.com\nPhone: +1234567890'),
+                  content: const Text(
+                      'Email: support@example.com\nPhone: +1234567890'),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
@@ -318,7 +319,7 @@ class _MenuPageState extends State<MenuPage> {
 }
 
 class AddUserPage extends StatelessWidget {
-  const AddUserPage({Key? key}) : super(key: key);
+  const AddUserPage({super.key});
 
   @override
   Widget build(BuildContext context) {

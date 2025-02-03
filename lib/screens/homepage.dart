@@ -6,7 +6,7 @@ import 'package:track_tag/screens/ScanDevicePage.dart';
 class HomePage extends StatefulWidget {
   final List<String> devices;
 
-  const HomePage({Key? key, required this.devices}) : super(key: key);
+  const HomePage({super.key, required this.devices});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -65,7 +65,7 @@ class _HomePageState extends State<HomePage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => MenuPage(
+                  builder: (context) => const MenuPage(
                     userEmail:
                         'user@example.com', // Pass user email dynamically
                     profilePhotoUrl:
@@ -100,9 +100,9 @@ class _HomePageState extends State<HomePage> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Column(
+                      child: const Column(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
+                        children: [
                           Icon(Icons.add, size: 40, color: Colors.teal),
                           SizedBox(height: 8),
                           Text(

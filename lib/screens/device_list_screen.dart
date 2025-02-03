@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/bluetooth_service.dart';
 
 class DeviceListScreen extends StatelessWidget {
-  const DeviceListScreen({Key? key}) : super(key: key);
+  const DeviceListScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -14,11 +14,13 @@ class DeviceListScreen extends StatelessWidget {
       body: Column(
         children: [
           ElevatedButton(
-            onPressed: bluetoothService.isScanning ? null : bluetoothService.startScan,
+            onPressed:
+                bluetoothService.isScanning ? null : bluetoothService.startScan,
             child: const Text("Start Scan"),
           ),
           ElevatedButton(
-            onPressed: bluetoothService.isScanning ? bluetoothService.stopScan : null,
+            onPressed:
+                bluetoothService.isScanning ? bluetoothService.stopScan : null,
             child: const Text("Stop Scan"),
           ),
           Expanded(
@@ -27,7 +29,8 @@ class DeviceListScreen extends StatelessWidget {
               itemBuilder: (context, index) {
                 final device = bluetoothService.devices[index];
                 return ListTile(
-                  title: Text(device.name.isNotEmpty ? device.name : "Unknown Device"),
+                  title: Text(
+                      device.name.isNotEmpty ? device.name : "Unknown Device"),
                   subtitle: Text(device.id),
                   trailing: ElevatedButton(
                     onPressed: () {

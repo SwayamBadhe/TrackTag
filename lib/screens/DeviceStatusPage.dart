@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 class DeviceStatusPage extends StatefulWidget {
-  const DeviceStatusPage({Key? key, required String deviceId}) : super(key: key);
+  const DeviceStatusPage({super.key, required String deviceId});
 
   @override
   _DeviceStatusPageState createState() => _DeviceStatusPageState();
@@ -13,8 +13,8 @@ class _DeviceStatusPageState extends State<DeviceStatusPage> {
   final TextEditingController _descriptionController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
   XFile? _profileImage;
-  double _batteryPercentage = 75; // Mock battery percentage
-  double _deviceDistance = 6; // Mock device distance
+  final double _batteryPercentage = 75; // Mock battery percentage
+  final double _deviceDistance = 6; // Mock device distance
 
   Future<void> _pickImage(ImageSource source) async {
     final pickedFile = await _picker.pickImage(source: source);
@@ -55,8 +55,9 @@ class _DeviceStatusPageState extends State<DeviceStatusPage> {
                     onTap: () => _showImagePickerDialog(),
                     child: CircleAvatar(
                       radius: 60,
-                      backgroundImage:
-                          _profileImage != null ? FileImage(File(_profileImage!.path)) : null,
+                      backgroundImage: _profileImage != null
+                          ? FileImage(File(_profileImage!.path))
+                          : null,
                       child: _profileImage == null
                           ? const Icon(Icons.camera_alt, size: 40)
                           : null,
@@ -96,7 +97,8 @@ class _DeviceStatusPageState extends State<DeviceStatusPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Battery Percentage:', style: TextStyle(fontSize: 16)),
+                const Text('Battery Percentage:',
+                    style: TextStyle(fontSize: 16)),
                 Text(
                   '$_batteryPercentage%',
                   style: TextStyle(
@@ -145,7 +147,7 @@ class _DeviceStatusPageState extends State<DeviceStatusPage> {
             TextField(
               controller: _descriptionController,
               maxLines: 4,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 hintText: 'Write a description...',
               ),

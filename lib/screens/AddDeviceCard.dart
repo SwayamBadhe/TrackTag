@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AddDeviceCard extends StatelessWidget {
-  const AddDeviceCard({Key? key}) : super(key: key);
+  const AddDeviceCard({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -23,12 +23,12 @@ class AddDeviceCard extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            child: SizedBox(
+            child: const SizedBox(
               height: 200,
               width: 100,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
+                children: [
                   Icon(
                     Icons.add,
                     size: 40,
@@ -53,4 +53,3 @@ class AddDeviceCard extends StatelessWidget {
     );
   }
 }
-

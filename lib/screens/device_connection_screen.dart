@@ -6,7 +6,7 @@ import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 class DeviceConnectionScreen extends StatelessWidget {
   final DiscoveredDevice device;
 
-  const DeviceConnectionScreen({Key? key, required this.device}) : super(key: key);
+  const DeviceConnectionScreen({super.key, required this.device});
 
   @override
   Widget build(BuildContext context) {
