@@ -24,8 +24,6 @@
 //   }
 // }
 
-
-
 import 'package:flutter/material.dart';
 import 'package:track_tag/screens/DeviceStatusPage.dart';
 import 'package:track_tag/screens/homepage.dart';
@@ -37,7 +35,7 @@ void main() {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +45,7 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         title: 'TrackTag App',
         theme: ThemeData(primarySwatch: Colors.teal),
-        home: const HomePage(devices:[]),
+        home: const HomePage(devices: []),
         // home: const DeviceStatusPage(),
       ),
     );
