@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "836869804362",
+    "project_id": "tracktag-bb931",
+    "storage_bucket": "tracktag-bb931.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:836869804362:android:4491f1f2f783fe3e99b1b3",
+        "android_client_info": {
+          "package_name": "com.example.track_tag"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCCV2pwb07tqDkbcw61ltDdS8YvQYpxVq0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
