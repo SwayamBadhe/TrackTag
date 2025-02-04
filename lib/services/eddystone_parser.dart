@@ -5,6 +5,7 @@ class EddystoneParser {
     return device.manufacturerData.isNotEmpty &&
         device.manufacturerData.length >= 20 &&
         device.manufacturerData[0] == 0xAA &&
-        device.manufacturerData[1] == 0xFE;
+        device.manufacturerData[1] == 0xFE &&
+        device.manufacturerData[2] == 0x00;
   }
 }
