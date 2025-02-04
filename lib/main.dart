@@ -1,36 +1,17 @@
-// import 'package:flutter/material.dart';
-// import 'package:track_tag/login_page.dart';
-// import 'package:track_tag/register_page.dart';
-// import 'package:track_tag/scanner/ScanDevicePage.dart';
-// import 'package:track_tag/screens/card_page_screen.dart';
-
-// void main() {
-//   runApp(MyApp());
-// }
-
-// class MyApp extends StatelessWidget {
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       title: 'Device Scanner App',
-//       initialRoute: '/cardPageScreen',
-//       routes: {
-//         // '/': (context) => const RegisterPage(), // Your registration page
-//         '/login': (context) => const LoginPage(), // Your login page
-//         // '/': (context) => const ScanDevicePage(),
-//         '/cardPageScreen': (context) => HomePage(),
-//       },
-//     );
-//   }
-// }
-
 import 'package:flutter/material.dart';
-import 'package:track_tag/screens/DeviceStatusPage.dart';
+import 'package:track_tag/screens/auth_screen.dart';
 import 'package:track_tag/screens/homepage.dart';
 import 'services/bluetooth_service.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'firebase_options.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+  options: DefaultFirebaseOptions.currentPlatform,
+);
   runApp(const MyApp());
 }
 
@@ -45,7 +26,7 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         title: 'TrackTag App',
         theme: ThemeData(primarySwatch: Colors.teal),
-        home: const HomePage(devices: []),
+        home: const AuthScreen(),
         // home: const DeviceStatusPage(),
       ),
     );
