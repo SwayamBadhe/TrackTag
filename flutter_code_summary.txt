@@ -1,0 +1,72 @@
+Functions: registerPlugins
+
+📌 File: .\.dart_tool\flutter_build\dart_plugin_registrant.dart
+Classes: _PluginRegistrant
+Functions: register
+
+📌 File: .\lib\firebase_options.dart
+Classes: DefaultFirebaseOptions
+
+📌 File: .\lib\main.dart
+Classes: MyApp
+Functions: main, MyApp, MyApp, build, CircularProgressIndicator, CircularProgressIndicator, LoginPage
+
+📌 File: .\lib\helpers\google_signin_helper.dart
+Classes: GoogleSignInHelper
+
+📌 File: .\lib\screens\AddDeviceCard.dart
+Classes: AddDeviceCard
+Functions: AddDeviceCard, build, Text, SnackBar
+
+📌 File: .\lib\screens\auth_screen.dart
+Classes: AuthScreen, _AuthScreenState
+Functions: AuthScreen, createState, HomePage, SnackBar, build, Text, InputDecoration, InputDecoration, SizedBox, Text
+
+📌 File: .\lib\screens\DeviceStatusPage.dart
+Classes: DeviceStatusPage, _DeviceStatusPageState
+Functions: DeviceStatusPage, createState, _getDistanceColor, build, Text, Icon, SizedBox, SizedBox, Text, Text, SizedBox, SizedBox, Center, Center, Center, SizedBox, Text, SizedBox, _showImagePickerDialog, Icon, Text, Icon, Text
+
+📌 File: .\lib\screens\device_connection_screen.dart
+Classes: DeviceConnectionScreen
+Functions: DeviceConnectionScreen, build, SizedBox, Text
+
+📌 File: .\lib\screens\device_list_screen.dart
+Classes: DeviceListScreen
+Functions: DeviceListScreen, build, Text, Text, Text, Text
+
+📌 File: .\lib\screens\homepage.dart
+Classes: HomePage, _HomePageState
+Functions: HomePage, initState, _navigateToScanPage, ScanDevicePage, build, Icon, Icon, Icon, Text, SizedBox
+
+📌 File: .\lib\screens\MenuPage.dart
+Classes: MenuPage, _MenuPageState, AddUserPage
+Functions: _showImageSourceDialog, Text, Icon, Text, _pickImage, Icon, Text, _pickImage, build, Text, Icon, SizedBox, TextStyle, Divider, Icon, Text, AddUserPage, Divider, Icon, Text, Text, Text, Divider, Icon, Text, Text, Text, Divider, Icon, Text, AddUserPage, build, Text
+
+📌 File: .\lib\screens\register_device_page.dart
+Classes: RegisterDevicePage, _RegisterDevicePageState
+Functions: RegisterDevicePage, createState, build, Text, TextStyle, SizedBox, InputDecoration, SizedBox, TextStyle, SizedBox, CircularProgressIndicator, Text
+
+📌 File: .\lib\screens\ScanDevicePage.dart
+Classes: ScanDevicePage, _ScanDevicePageState
+Functions: ScanDevicePage, createState, initState, build, Text, InputDecoration, SizedBox, Text, SizedBox, Text, SizedBox, Text, Text, SizedBox, _toggleScan, _showScanner, SnackBar
+
+📌 File: .\lib\screens\auth\login_page.dart
+Classes: LoginPage, _LoginPageState
+Functions: createState, build, Text, Text
+
+📌 File: .\lib\screens\auth\signup_page.dart
+Classes: SignupPage, _SignupPageState
+Functions: createState, fetchUserDevicesAndNavigate, build, Text, InputDecoration, SizedBox, InputDecoration, SizedBox, InputDecoration, SizedBox, TextStyle, SizedBox, CircularProgressIndicator, Text
+
+📌 File: .\lib\services\bluetooth_service.dart
+Classes: BluetoothService
+Functions: startScan, stopScan, _checkDeviceRange, fetchUserDevicesAndNavigate, _checkAuthState
+
+📌 File: .\lib\services\device_service.dart
+Classes: DeviceService
+Functions: Exception, Exception
+
+📌 File: .\lib\services\eddystone_parser.dart
+Classes: EddystoneParser
+Functions: isEddystone
+Functions: main, MyApp
