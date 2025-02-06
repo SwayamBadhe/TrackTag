@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:track_tag/screens/DeviceStatusPage.dart';
 import 'package:track_tag/screens/MenuPage.dart';
 import 'package:track_tag/screens/ScanDevicePage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:track_tag/screens/DeviceStatusPage.dart';
 
 class HomePage extends StatefulWidget {
   final List<String> devices;
@@ -34,30 +35,15 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Get the current user from Firebase Authentication
+    final user = FirebaseAuth.instance.currentUser;
+    String? userEmail = user?.email ?? 'No email'; // Default fallback
+    String? profilePhotoUrl = user?.photoURL ?? ''; // Default fallback
+
     return Scaffold(
       appBar: AppBar(
-        leading: DropdownButtonHideUnderline(
-          child: DropdownButton<String>(
-            items: <String>['English', 'Marathi', 'Hindi'].map((String value) {
-              return DropdownMenuItem<String>(
-                value: value,
-                child: Text(value),
-              );
-            }).toList(),
-            onChanged: (String? newValue) {
-              // Handle language change
-            },
-            icon: const Icon(Icons.language, color: Colors.white),
-          ),
-        ),
-        // actions: [
-        //   IconButton(
-        //     icon: const Icon(Icons.menu),
-        //     onPressed: () {
-        //       // Handle menu action
-        //     },
-        //   ),
-        // ],
+        title: const Text("Home Page"),
+        centerTitle: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.menu),
@@ -65,20 +51,15 @@ class _HomePageState extends State<HomePage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const MenuPage(
-                    userEmail:
-                        'user@example.com', // Pass user email dynamically
-                    profilePhotoUrl:
-                        'https://example.com/profile.jpg', // Pass profile photo URL dynamically
+                  builder: (context) => MenuPage(
+                    userEmail: userEmail, // Pass actual user email
+                    profilePhotoUrl: profilePhotoUrl, // Pass actual profile photo URL
                   ),
                 ),
               );
             },
           ),
         ],
-
-        title: const Text("Home Page"),
-        centerTitle: true,
       ),
       body: Column(
         children: [
