@@ -9,6 +9,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:track_tag/services/eddystone_parser.dart';  
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
+import 'dart:math';
 
 class BluetoothService extends ChangeNotifier {
   final FlutterReactiveBle flutterReactiveBle = FlutterReactiveBle();
@@ -68,11 +69,57 @@ class BluetoothService extends ChangeNotifier {
       print('Error initializing notifications: $e');
     }
   }
+
+  // Store recent RSSI readings for smoothing
+final Map<String, List<int>> _rssiHistory = {};
+final Map<String, double> _distanceMap = {};
+
+// Moving average filter to smooth out RSSI fluctuations
+double _calculateDistance(int? txPower, double rssi) {
+  if (txPower == null) txPower = -59; 
+  if (rssi == 0) return -1.0; 
+
+  const double pathLossExponent = 2.7; 
+
+  double distance = pow(10, (txPower - rssi) / (10 * pathLossExponent)).toDouble();
+
+  return distance; 
+}
+
+
+int? _extractTxPower(List<int> manufacturerData) {
+  if (manufacturerData.isEmpty) return null;
+
+  // Many BLE devices store TxPower in the last byte
+  return manufacturerData.last; 
+}
+
+double _applyMovingAverage(String deviceId, double newRssi) {
+  const int windowSize = 5;
+  _rssiHistory.putIfAbsent(deviceId, () => []);
+  List<int> history = _rssiHistory[deviceId]!;
+
+  if (history.length >= windowSize) {
+    history.removeAt(0);
+  }
+  history.add(newRssi.toInt());
+
+  return history.reduce((a, b) => a + b) / history.length; // Smoothed RSSI
+}
+
+double getEstimatedDistance(String deviceId) {
+  return _distanceMap[deviceId] ?? -1.0; // Return stored distance or default -1.0 if not found
+}
+
+int getSmoothedRssi(String deviceId) {
+  return _rssiMap[deviceId] ?? -100; // Return stored RSSI or default -100 if not found
+}
+
   
   /// Starts scanning for BLE devices and filters Eddystone beacons.
   /// Stores unique devices and updates their RSSI values in a map.
   Future<void> startScan() async {
-  if (_isScanning) return; // Avoid multiple scans
+  if (_isScanning) return;
 
   bool hasPermission = await _checkAndRequestPermissions();
   if (!hasPermission) {
@@ -82,37 +129,97 @@ class BluetoothService extends ChangeNotifier {
 
   if (flutterReactiveBle.status != BleStatus.ready) {
     print("Bluetooth is not ready. Requesting user to enable it...");
-    await _requestEnableBluetooth(); // Prompt user to enable Bluetooth
+    await _requestEnableBluetooth();
     return;
   }
 
   _isScanning = true;
   notifyListeners();
 
-  _scanSubscription = flutterReactiveBle.scanForDevices(withServices: [], scanMode: ScanMode.lowLatency).listen(
-  (device) {
-    final existingDeviceIndex = _devices.indexWhere((d) => d.id == device.id);
-    if (existingDeviceIndex == -1) {
-      _devices.add(device);
-    } else {
-      _devices[existingDeviceIndex] = device;
-    }
-    notifyListeners();
-  }, 
-  onError: (error) {
-    print("Scan error: $error");
-    _isScanning = false;
-    notifyListeners();
-  },
-  onDone: () {
-    print("Scan stopped. Restarting...");
-    startScan();  // ✅ Restart scan when it stops
-  }
-);
+  _scanSubscription = flutterReactiveBle.scanForDevices(
+    withServices: [],
+    scanMode: ScanMode.lowLatency,
+    requireLocationServicesEnabled: true,
+  ).listen(
+    (device) {
+      try {
+        final String deviceId = device.id;
+        final String localName = device.name.isNotEmpty ? device.name : "Unknown";
+        final List<String> serviceUuids = device.serviceUuids.map((uuid) => uuid.toString()).toList();
+        final List<int> manufacturerData = device.manufacturerData;
+        final int rssi = device.rssi;
 
+        // Apply a moving average filter to RSSI
+        double smoothedRssi = _applyMovingAverage(deviceId, rssi.toDouble());
+        
+        // Extract TxPower from Manufacturer Data (if available)
+        int? txPower = _extractTxPower(manufacturerData);
+
+        // Calculate distance
+        double estimatedDistance = _calculateDistance(txPower, smoothedRssi);
+
+        // Store RSSI & distance values
+        _rssiMap[deviceId] = smoothedRssi.toInt();
+        _distanceMap[deviceId] = estimatedDistance;
+
+        print('\n🔹 Device Found:');
+        print('ID: $deviceId');
+        print('Name: $localName');
+        print('RSSI: $rssi dBm (Smoothed: ${smoothedRssi.toStringAsFixed(1)})');
+        print('Estimated Distance: ${estimatedDistance.toStringAsFixed(2)} meters');
+
+        if (serviceUuids.isNotEmpty) {
+          print('   🔧 Service UUIDs:');
+          for (var uuid in serviceUuids) {
+            print('      - $uuid');
+          }
+        }
+
+        if (manufacturerData.isNotEmpty) {
+          print('Manufacturer Data:');
+          print('- Raw: ${manufacturerData.map((b) => b.toRadixString(16).padLeft(2, '0')).join(':')}');
+
+          try {
+            final eddystoneData = EddystoneParser.parseManufacturerData(manufacturerData);
+            if (eddystoneData != null) {
+              print('- Eddystone Format Detected:');
+              print('Frame Type: ${eddystoneData['frameType']}');
+            }
+          } catch (e) {
+            print('- Not Eddystone format');
+          }
+        }
+
+        final existingDeviceIndex = _devices.indexWhere((d) => d.id == deviceId);
+        if (existingDeviceIndex == -1) {
+          _devices.add(device);
+        } else {
+          _devices[existingDeviceIndex] = device;
+        }
+
+        _devicesController.add(_devices);
+        notifyListeners();
+
+        if (estimatedDistance < userDefinedRange) {
+          _showNotification(device);
+          Vibration.vibrate();
+        }
+
+      } catch (e) {
+        print('Error processing device data: $e');
+      }
+    },
+    onError: (error) {
+      print("❌ Scan error: $error");
+      _isScanning = false;
+      notifyListeners();
+    },
+    onDone: () {
+      print("📡 Scan stopped. Restarting...");
+      startScan();
+    },
+  );
 }
-
-
   Future<void> _requestEnableBluetooth() async {
     const platform = MethodChannel('flutter_bluetooth');
     try {

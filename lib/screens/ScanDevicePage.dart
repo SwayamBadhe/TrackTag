@@ -3,6 +3,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import 'package:track_tag/services/bluetooth_service.dart';
 import 'package:track_tag/screens/register_device_page.dart';
+import 'package:track_tag/screens/device_info_card.dart';
 import 'package:track_tag/screens/homepage.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -93,23 +94,48 @@ class _ScanDevicePageState extends State<ScanDevicePage> {
             ),
             const SizedBox(height: 16),
             Expanded(
-              child: ListView.builder(
-                itemCount: bluetoothService.devices.length,
-                itemBuilder: (context, index) {
-                  final device = bluetoothService.devices[index];
-                  return ListTile(
-                    title: Text(device.name.isNotEmpty ? device.name : "Unknown Device"),
-                    subtitle: Text("ID: ${device.id} | RSSI: ${device.rssi}"),
-                    onTap: () {
-                      setState(() {
-                        _deviceIdController.text = device.id;
-                      });
-                    },
+              child: StreamBuilder<List<DiscoveredDevice>>(
+                stream: bluetoothService.deviceStream,
+                initialData: bluetoothService.devices,
+                builder: (context, snapshot) {
+                  final devices = snapshot.data ?? [];
+
+                  if (bluetoothService.isScanning && devices.isEmpty) {
+                    return const Center(
+                    child: CircularProgressIndicator(),
                   );
-                },
-              ),
+                }
+
+                if (devices.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No Bluetooth devices found',
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  itemCount: devices.length,
+                  itemBuilder: (context, index) {
+                    final device = devices[index];
+                    return DeviceInfoCard(
+                      key: ValueKey(device.id),
+                      device: device,
+                      estimatedDistance: bluetoothService.getEstimatedDistance(device.id), // Pass distance
+                      smoothedRssi: bluetoothService.getSmoothedRssi(device.id), // Pass smoothed RSSI
+                      onDeviceSelected: (deviceId) {
+                        setState(() {
+                          _deviceIdController.text = deviceId;
+                        });
+                      },
+                    );
+                  },
+                );
+              },
             ),
-            
+          ),
+
           ],
         ),
       ),
