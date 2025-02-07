@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:track_tag/screens/DeviceStatusPage.dart';
+import 'package:track_tag/screens/device_status_page.dart';
 import 'package:track_tag/screens/auth/login_page.dart';
 import 'services/bluetooth_service.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:track_tag/screens/homepage.dart';
-import 'package:track_tag/screens/MenuPage.dart';
+import 'package:track_tag/screens/home_page.dart';
+import 'package:track_tag/screens/menu_page.dart';
 import 'firebase_options.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -42,15 +42,15 @@ class MyApp extends StatelessWidget {
               _fetchUserDevicesAndNavigate(context, user);
               return const CircularProgressIndicator();  // Or any loading widget until the devices are fetched
             } else {
-              return LoginPage();
+              return const LoginPage();
             }
           },
         ),
         routes: {
-          '/login': (context) => LoginPage(),
+          '/login': (context) => const LoginPage(),
           '/homepage': (context) => const HomePage(devices: []), 
-          '/menu': (context) => MenuPage(userEmail: 'user@example.com', profilePhotoUrl: 'https://example.com/profile.jpg'),
-          '/deviceStatus': (context) => DeviceStatusPage(deviceId: ''),
+          '/menu': (context) => const MenuPage(userEmail: 'user@example.com', profilePhotoUrl: 'https://example.com/profile.jpg'),
+          '/deviceStatus': (context) => const DeviceStatusPage(deviceId: ''),
         },
       ),
     );
@@ -76,7 +76,7 @@ Future<void> _fetchUserDevicesAndNavigate(BuildContext context, User user) async
     print("Error fetching user devices: $e");
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => HomePage(devices: [])), // Fallback
+      MaterialPageRoute(builder: (context) => const HomePage(devices: [])), // Fallback
     );
   }
 }

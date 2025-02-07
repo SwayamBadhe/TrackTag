@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:track_tag/services/bluetooth_service.dart';
 import 'package:track_tag/screens/register_device_page.dart';
 import 'package:track_tag/screens/device_info_card.dart';
-import 'package:track_tag/screens/homepage.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,10 +12,10 @@ class ScanDevicePage extends StatefulWidget {
   const ScanDevicePage({super.key});
 
   @override
-  _ScanDevicePageState createState() => _ScanDevicePageState();
+  ScanDevicePageState createState() => ScanDevicePageState();
 }
 
-class _ScanDevicePageState extends State<ScanDevicePage> {
+class ScanDevicePageState extends State<ScanDevicePage> {
   final TextEditingController _deviceIdController = TextEditingController();
   String? _scannedData;
   bool _isScanning = false;
@@ -122,8 +121,8 @@ class _ScanDevicePageState extends State<ScanDevicePage> {
                     return DeviceInfoCard(
                       key: ValueKey(device.id),
                       device: device,
-                      estimatedDistance: bluetoothService.getEstimatedDistance(device.id), // Pass distance
-                      smoothedRssi: bluetoothService.getSmoothedRssi(device.id), // Pass smoothed RSSI
+                      estimatedDistance: bluetoothService.getEstimatedDistance(device.id), 
+                      smoothedRssi: bluetoothService.getSmoothedRssi(device.id), 
                       onDeviceSelected: (deviceId) {
                         setState(() {
                           _deviceIdController.text = deviceId;

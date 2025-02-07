@@ -9,12 +9,12 @@ class DeviceInfoCard extends StatelessWidget {
   final int smoothedRssi;
 
   const DeviceInfoCard({
-    Key? key,
+    super.key,
     required this.device,
     required this.estimatedDistance,
     required this.smoothedRssi,
     required this.onDeviceSelected,
-  }) : super(key: key);
+  });
 
 
   @override

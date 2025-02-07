@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:track_tag/screens/MenuPage.dart';
-import 'package:track_tag/screens/ScanDevicePage.dart';
+import 'package:track_tag/screens/menu_page.dart';
+import 'package:track_tag/screens/scan_device_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:track_tag/screens/DeviceStatusPage.dart';
+import 'package:track_tag/screens/device_status_page.dart';
 
 class HomePage extends StatefulWidget {
   final List<String> devices;

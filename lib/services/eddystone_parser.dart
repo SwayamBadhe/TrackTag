@@ -1,5 +1,3 @@
-import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
-
 // lib/services/eddystone_parser.dart
 
 class EddystoneParser {

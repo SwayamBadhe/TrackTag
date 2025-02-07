@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:track_tag/helpers/google_signin_helper.dart';
-import 'package:track_tag/screens/homepage.dart'; 
+import 'package:track_tag/screens/home_page.dart'; 
 
 class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
   @override
-  _LoginPageState createState() => _LoginPageState();
+  LoginPageState createState() => LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class LoginPageState extends State<LoginPage> {
   final GoogleSignInHelper _googleSignInHelper = GoogleSignInHelper();
 
   @override
@@ -33,12 +35,12 @@ class _LoginPageState extends State<LoginPage> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => HomePage(devices: []), // Placeholder for devices
+          builder: (context) => const HomePage(devices: []), // Placeholder for devices
         ),
       );
     } else {
       // Handle sign-in error or cancellation
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Google Sign-In failed.")));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Google Sign-In failed.")));
     }
   }
 }

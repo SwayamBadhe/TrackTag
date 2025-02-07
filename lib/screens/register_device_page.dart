@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:track_tag/services/device_service.dart';
-import 'package:track_tag/screens/homepage.dart';
+import 'package:track_tag/screens/home_page.dart';
 
 class RegisterDevicePage extends StatefulWidget {
   final String deviceId; // Device ID to register
@@ -9,10 +9,10 @@ class RegisterDevicePage extends StatefulWidget {
   const RegisterDevicePage({super.key, required this.deviceId});
 
   @override
-  _RegisterDevicePageState createState() => _RegisterDevicePageState();
+  RegisterDevicePageState createState() => RegisterDevicePageState();
 }
 
-class _RegisterDevicePageState extends State<RegisterDevicePage> {
+class RegisterDevicePageState extends State<RegisterDevicePage> {
   final TextEditingController _deviceNameController = TextEditingController();
   bool _isRegistering = false;
   String? _errorMessage;

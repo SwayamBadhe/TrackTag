@@ -2,7 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:track_tag/screens/homepage.dart';
+import 'package:track_tag/screens/home_page.dart';
 
 Future<void> fetchUserDevicesAndNavigate(BuildContext context, User user) async {
   try {
