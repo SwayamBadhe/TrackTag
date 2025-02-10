@@ -86,7 +86,7 @@ class ScanDevicePageState extends State<ScanDevicePage> {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: bluetoothService.isScanning
+              onPressed: _isScanning
                   ? bluetoothService.stopScan
                   : bluetoothService.startScan,
               child: Text(bluetoothService.isScanning ? "Stop Scan" : "Start Scan"),

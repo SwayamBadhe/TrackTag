@@ -65,6 +65,7 @@ class BluetoothScanner extends ChangeNotifier {
     int? txPower = trackingService.extractTxPower(manufacturerData);
     double estimatedDistance = trackingService.calculateDistance(txPower, filteredRssi);
 
+    // Store RSSI & estimated distance
     trackingService.rssiMap[deviceId] = filteredRssi.toInt();
     trackingService.distanceMap[deviceId] = estimatedDistance;
 
@@ -96,10 +97,11 @@ class BluetoothScanner extends ChangeNotifier {
       }
     }
 
-    if (trackingInfo.isTracking) {
-      trackingService.updateDeviceStatus(deviceId);
-    }
+    // 🔹 Update and check device status
+    trackingService.updateDeviceStatus(deviceId);
+    trackingService.checkDeviceStatus(deviceId); 
 
+    // 🔹 Store device in the list (update or add new)
     final existingDeviceIndex = _devices.indexWhere((d) => d.id == deviceId);
     if (existingDeviceIndex == -1) {
       _devices.add(device);
@@ -107,9 +109,11 @@ class BluetoothScanner extends ChangeNotifier {
       _devices[existingDeviceIndex] = device;
     }
 
+    // Notify UI
     _devicesController.add(_devices);
     notifyListeners();
 
+    // 🔹 Alert user if within range
     if (estimatedDistance < trackingService.userDefinedRange) {
       _notificationService.showNotification(device);
       Vibration.vibrate();
@@ -159,9 +163,11 @@ class BluetoothScanner extends ChangeNotifier {
   }
 
   void stopScan() {
+    if (!_isScanning) return;
     _scanSubscription?.cancel();
     _scanSubscription = null;
     _isScanning = false;
+    flutterReactiveBle.deinitialize();
   }
 
    @override
