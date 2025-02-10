@@ -14,11 +14,34 @@ import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import android.content.ComponentName
+import android.content.ServiceConnection
+import android.os.IBinder
+import android.provider.Settings
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "flutter_bluetooth"
     private val PERMISSION_REQUEST_CODE = 2
     private val ENABLE_BLUETOOTH_REQUEST_CODE = 1
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // Start Foreground Service for BLE scanning
+        val serviceIntent = Intent(this, MyForegroundService::class.java)
+        startService(serviceIntent)
+
+        // Start BLE Scanning
+        val bleScanManager = BleScanManager(this)
+        bleScanManager.startScan()
+
+        requestBatteryOptimization() // Ask user to disable battery optimization
+    }
+
+    private fun requestBatteryOptimization() {
+        val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+        startActivity(intent)
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
