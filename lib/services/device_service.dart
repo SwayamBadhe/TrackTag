@@ -13,6 +13,11 @@ class DeviceService {
     }
 
     final deviceRef = _firestore.collection('devices').doc(deviceId);
+    final docSnapshot = await deviceRef.get();
+
+    if (docSnapshot.exists) {
+      throw Exception('Device is already registered to another user');
+    }
 
     await deviceRef.set({
       'deviceId': deviceId,
@@ -20,7 +25,6 @@ class DeviceService {
       'userId': user.uid,
       'registeredAt': FieldValue.serverTimestamp(),
     });
-    
   }
 
   Future<bool> isDeviceRegistered(String deviceId) async {
