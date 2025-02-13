@@ -5,13 +5,13 @@ class DeviceInfoCard extends StatelessWidget {
   final DiscoveredDevice device;
   final Function(String) onDeviceSelected;
 
-  final double estimatedDistance;
+  final double? estimatedDistance;
   final int smoothedRssi;
 
   const DeviceInfoCard({
     super.key,
     required this.device,
-    required this.estimatedDistance,
+    this.estimatedDistance,
     required this.smoothedRssi,
     required this.onDeviceSelected,
   });
@@ -54,11 +54,11 @@ class DeviceInfoCard extends StatelessWidget {
                   'Smoothed RSSI',
                   '$smoothedRssi dBm',
                 ),
-                _buildInfoSection(
-                  'Estimated Distance',
-                  '${estimatedDistance.toStringAsFixed(2)} meters',
-                ),
-
+                if (estimatedDistance != null)
+                  _buildInfoSection(
+                    'Estimated Distance',
+                    '${estimatedDistance!.toStringAsFixed(2)} meters',
+                  ),
                 if (device.serviceUuids.isNotEmpty)
                   _buildServicesList('Service UUIDs', device.serviceUuids),
                 if (device.manufacturerData.isNotEmpty)

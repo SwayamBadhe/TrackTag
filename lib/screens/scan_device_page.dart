@@ -24,29 +24,18 @@ class ScanDevicePageState extends State<ScanDevicePage> {
   @override
   void initState() {
     super.initState();
-    _checkPermissionsAndStartScan();
+    _startScanning();
   }
 
-  Future<void> _checkPermissionsAndStartScan() async {
-    // Check and request Bluetooth permissions
-    if (await _requestBluetoothPermissions()) {
-      Provider.of<BluetoothService>(context, listen: false).startScan();
+  Future<void> _startScanning() async {
+    final bluetoothService = Provider.of<BluetoothService>(context, listen: false);
+    if (bluetoothService.flutterReactiveBle.status == BleStatus.ready) {
+      bluetoothService.startScan();
       setState(() {
         _isScanning = true;
       });
-    }
-  }
-
-  Future<bool> _requestBluetoothPermissions() async {
-    if (await Permission.bluetoothScan.request().isGranted &&
-        await Permission.bluetoothConnect.request().isGranted) {
-      return true;
     } else {
-      // Show alert if permissions are denied
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bluetooth permissions are required')),
-      );
-      return false;
+      print("Bluetooth is not enabled.");
     }
   }
 
@@ -56,59 +45,42 @@ class ScanDevicePageState extends State<ScanDevicePage> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Scan Device')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            if (_scannedData != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Text('Scanned Device ID: $_scannedData'),
-              ),
-            TextFormField(
-              controller: _deviceIdController,
-              decoration: const InputDecoration(labelText: 'Enter Device ID'),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _showScanner,
-              child: const Text('Scan QR Code'),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => _submitDeviceId(bluetoothService),
-              child: _isConnecting
-                  ? const CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    )
-                  : const Text('Register Device'),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _isScanning
-                  ? bluetoothService.stopScan
-                  : bluetoothService.startScan,
-              child: Text(bluetoothService.isScanning ? "Stop Scan" : "Start Scan"),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: StreamBuilder<List<DiscoveredDevice>>(
-                stream: bluetoothService.deviceStream,
-                initialData: bluetoothService.devices,
-                builder: (context, snapshot) {
-                  final devices = snapshot.data ?? [];
+      body: Column(
+        children: [
+          TextFormField(
+            controller: _deviceIdController,
+            decoration: const InputDecoration(labelText: 'Enter Device ID'),
+          ),
+          ElevatedButton(
+            onPressed: _showScanner,
+            child: const Text('Scan QR Code'),
+          ),
+          ElevatedButton(
+            onPressed: () => _submitDeviceId(bluetoothService),
+            child: _isConnecting
+                ? const CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  )
+                : const Text('Register Device'),
+          ),
+          ElevatedButton(
+            onPressed: _isScanning ? bluetoothService.stopScan : _startScanning,
+            child: Text(_isScanning ? "Stop Scan" : "Start Scan"),
+          ),
+          Expanded(
+            child: StreamBuilder<List<DiscoveredDevice>>(
+              stream: bluetoothService.deviceStream,
+              initialData: bluetoothService.devices,
+              builder: (context, snapshot) {
+                final devices = snapshot.data ?? [];
 
-                  if (bluetoothService.isScanning && devices.isEmpty) {
-                    return const Center(
-                    child: CircularProgressIndicator(),
-                  );
+                if (_isScanning && devices.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
                 }
 
                 if (devices.isEmpty) {
                   return const Center(
-                    child: Text(
-                      'No Bluetooth devices found',
+                    child: Text('No Bluetooth devices found',
                       style: TextStyle(fontSize: 16, color: Colors.grey),
                     ),
                   );
@@ -121,8 +93,7 @@ class ScanDevicePageState extends State<ScanDevicePage> {
                     return DeviceInfoCard(
                       key: ValueKey(device.id),
                       device: device,
-                      estimatedDistance: bluetoothService.getEstimatedDistance(device.id), 
-                      smoothedRssi: bluetoothService.getSmoothedRssi(device.id), 
+                      smoothedRssi: device.rssi,
                       onDeviceSelected: (deviceId) {
                         setState(() {
                           _deviceIdController.text = deviceId;
@@ -134,9 +105,7 @@ class ScanDevicePageState extends State<ScanDevicePage> {
               },
             ),
           ),
-
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -164,24 +133,19 @@ class ScanDevicePageState extends State<ScanDevicePage> {
       });
 
       try {
-        // Connect to the device
         await bluetoothService.connectToDevice(deviceId);
-
-        // Save the device ID using SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         List<String> deviceIds = prefs.getStringList('device_ids') ?? [];
 
         if (!deviceIds.contains(deviceId)) {
-          deviceIds.add(deviceId); // Add the new device ID
+          deviceIds.add(deviceId);
           await prefs.setStringList('device_ids', deviceIds);
         }
 
-        // Notify the user and navigate to the HomePage
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Device connected: $deviceId')),
         );
 
-        // Navigate to the RegisterDevicePage
         Navigator.of(context).push(MaterialPageRoute(
           builder: (context) => RegisterDevicePage(deviceId: deviceId),
         ));
