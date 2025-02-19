@@ -1,14 +1,21 @@
 import 'dart:io';
+import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:track_tag/services/bluetooth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:track_tag/services/notification_service.dart';
+import 'package:track_tag/services/device_tracking_service.dart';
 
 class DeviceStatusPage extends StatefulWidget {
   final String deviceId;
-  const DeviceStatusPage({super.key, required this.deviceId});
+
+  const DeviceStatusPage({
+    super.key,
+    required this.deviceId,
+  });
 
   @override
   DeviceStatusPageState createState() => DeviceStatusPageState();
@@ -17,191 +24,155 @@ class DeviceStatusPage extends StatefulWidget {
 class DeviceStatusPageState extends State<DeviceStatusPage> {
   final TextEditingController _descriptionController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
+  late DeviceTrackingService _deviceTrackingService;
+  late NotificationService notificationService;
   XFile? _profileImage;
   bool isTracking = false;
 
   @override
   void initState() {
     super.initState();
+    notificationService = NotificationService();
     _loadTrackingState();
+    _deviceTrackingService = DeviceTrackingService(notificationService);
+  }
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadTrackingState() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       isTracking = prefs.getBool('tracking_${widget.deviceId}') ?? false;
+      debugPrint("Tracking state for ${widget.deviceId}: $isTracking");
     });
   }
 
   Future<void> _toggleTracking() async {
-    setState(() {
-      isTracking = !isTracking;
-    });
+    final deviceTrackingService = Provider.of<DeviceTrackingService>(context, listen: false);
+    await deviceTrackingService.toggleTracking(widget.deviceId);
+
+    debugPrint("🛠️ Checking tracking state after toggle: ${deviceTrackingService.isDeviceTracking(widget.deviceId)}");
+
     final prefs = await SharedPreferences.getInstance();
-    prefs.setBool('tracking_${widget.deviceId}', isTracking);
-    final bluetoothService = Provider.of<BluetoothService>(context, listen: false);
-    if (isTracking) {
-      bluetoothService.startScan();
-    } else {
-      bluetoothService.stopScan();
-    }
+    bool? storedTrackingState = prefs.getBool('tracking_${widget.deviceId}');
+    
+    debugPrint("🛠️ Stored tracking state: $storedTrackingState");
+
+    setState(() {
+      isTracking = storedTrackingState ?? false;
+    });
+
+    debugPrint("🛠️ UI Updated: isTracking = $isTracking");
   }
 
   Future<void> _pickImage(ImageSource source) async {
-    final pickedFile = await _picker.pickImage(source: source);
-    if (pickedFile != null) {
-      setState(() {
-        _profileImage = pickedFile;
-      });
+    try {
+      final pickedFile = await _picker.pickImage(source: source);
+      if (pickedFile != null) {
+        setState(() => _profileImage = pickedFile);
+      }
+    } catch (e) {
+      debugPrint("Error picking image: $e");
     }
   }
 
   @override
-
   Widget build(BuildContext context) {
     final bluetoothService = Provider.of<BluetoothService>(context);
+    final trackingService = Provider.of<DeviceTrackingService>(context);
 
-    return StreamBuilder<List<DiscoveredDevice>>(
-      stream: bluetoothService.deviceStream,
-      builder: (context, snapshot) {
-        final trackingInfo = bluetoothService.getDeviceTrackingInfo(widget.deviceId);
-        final distance = bluetoothService.getEstimatedDistance(widget.deviceId);
-        final rssi = bluetoothService.getSmoothedRssi(widget.deviceId);
-        
-      return Scaffold(
-        appBar: AppBar(title: const Text('Device Status')),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Profile Image Section
-              Center(
-                child: GestureDetector(
-                  onTap: () => _showImagePickerDialog(),
-                  child: CircleAvatar(
-                    radius: 60,
-                    backgroundImage: _profileImage != null 
-                        ? FileImage(File(_profileImage!.path)) 
-                        : null,
-                    child: _profileImage == null 
-                        ? const Icon(Icons.camera_alt, size: 40) 
-                        : null,
-                  ),
+    return Scaffold(
+      appBar: AppBar(title: const Text('Device Status')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: GestureDetector(
+                onTap: () => _showImagePickerDialog(),
+                child: CircleAvatar(
+                  radius: 60,
+                  backgroundImage: _profileImage != null 
+                      ? FileImage(File(_profileImage!.path)) 
+                      : null,
+                  child: _profileImage == null 
+                      ? const Icon(Icons.camera_alt, size: 40) 
+                      : null,
                 ),
               ),
-              const SizedBox(height: 16),
-
-              // Description Section
-              const Text('Description:', style: TextStyle(fontSize: 16)),
-              TextField(
-                controller: _descriptionController,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  hintText: 'Write a description...'
-                ),
+            ),
+            const SizedBox(height: 16),
+            const Text('Description:', style: TextStyle(fontSize: 16)),
+            TextField(
+              controller: _descriptionController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'Write a description...'
               ),
+            ),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              title: const Text('Enable Tracking'),
+              subtitle: Text(isTracking 
+                  ? 'Device is being monitored' 
+                  : 'Device tracking is disabled'),
+              value: isTracking,
+              onChanged: (value) => _toggleTracking(),
+            ),
+            if (isTracking) ...[
               const SizedBox(height: 16),
-
-              // Status Card
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Status: ${trackingInfo.isLost ? "Lost" : "Connected"}',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: trackingInfo.isLost ? Colors.red : Colors.green,
+                      StreamBuilder<List<DiscoveredDevice>>(
+                        stream: bluetoothService.deviceStream.map(
+                          (devices) => devices.where((d) => d.id == widget.deviceId).toList(),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Movement: ${trackingInfo.movementStatus}',
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                      Text(
-                        'Last Seen: ${trackingInfo.lastSeen?.toString() ?? "N/A"}',
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Distance and Signal Strength
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      _buildStatusRow(
-                        'Distance',
-                        '${distance.toStringAsFixed(2)} meters',
-                        _getDistanceColor(distance),
-                      ),
-                      const SizedBox(height: 8),
-                      _buildStatusRow(
-                        'Signal Strength',
-                        '$rssi dBm',
-                        _getRssiColor(rssi),
+                        builder: (context, snapshot) {
+                          final trackingInfo = bluetoothService.getDeviceTrackingInfo(widget.deviceId);
+                          final distance = bluetoothService.getEstimatedDistance(widget.deviceId);
+                          final rssi = bluetoothService.getSmoothedRssi(widget.deviceId);
+                          const connectionState = null;
+                          
+                          return Column(
+                            children: [
+                              _buildConnectionStatus(connectionState),
+                              const SizedBox(height: 16),
+                              _buildStatusRow('Movement', trackingInfo.movementStatus, 
+                                  trackingInfo.movementStatus == 'Stationary' ? Colors.green : Colors.orange),
+                              const SizedBox(height: 8),
+                              _buildStatusRow('Distance', '${distance.toStringAsFixed(2)} meters', 
+                                  _getDistanceColor(distance)),
+                              const SizedBox(height: 8),
+                              _buildStatusRow('Signal Strength', '$rssi dBm', 
+                                  _getRssiColor(rssi)),
+                              const SizedBox(height: 16),
+                              _buildLastSeen(trackingInfo.lastSeen),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-
-              // Action Buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () => bluetoothService.startActiveSearch(widget.deviceId),
-                    icon: const Icon(Icons.search),
-                    label: const Text('Find'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                    ),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: trackingInfo.isLost 
-                        ? () => bluetoothService.startActiveSearch(widget.deviceId)
-                        : null,
-                    icon: const Icon(Icons.location_searching),
-                    label: const Text('Lost'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Tracking Toggle
-              SwitchListTile(
-                title: const Text('Enable Tracking'),
-                subtitle: Text(trackingInfo.isTracking 
-                    ? 'Device is being monitored' 
-                    : 'Device tracking is disabled'),
-                value: trackingInfo.isTracking,
-                onChanged: (value) => bluetoothService.toggleTracking(widget.deviceId),
               ),
             ],
-          ),
+          ],
         ),
-      );
-      
-      },
+      ),
     );
   }
 
-  Widget _buildStatusRow(String label, String value, Color color) {
+
+Widget _buildStatusRow(String label, String value, Color color) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -218,16 +189,52 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
     );
   }
 
-  Color _getDistanceColor(double distance) {
-    if (distance <= 3) return Colors.green;
-    if (distance <= 5) return Colors.orange;
-    return Colors.red;
+  Widget _buildConnectionStatus(TrackedDeviceState state) {
+    IconData icon;
+    String text;
+    Color color;
+
+    switch (state) {
+      case TrackedDeviceState.connected:
+        icon = Icons.bluetooth_connected;
+        text = "Connected";
+        color = Colors.green;
+        break;
+      case TrackedDeviceState.disconnected:
+        icon = Icons.bluetooth_disabled;
+        text = "Disconnected";
+        color = Colors.red;
+        break;
+      case TrackedDeviceState.lost:
+        icon = Icons.warning;
+        text = "Device Lost";
+        color = Colors.orange;
+        break;
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, color: color, size: 24),
+        const SizedBox(width: 8),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+      ],
+    );
   }
 
-  Color _getRssiColor(int rssi) {
-    if (rssi >= -60) return Colors.green;
-    if (rssi >= -80) return Colors.orange;
-    return Colors.red;
+  Widget _buildLastSeen(DateTime? lastSeen) {
+    return lastSeen == null
+        ? const Text('Last Seen: Unknown', style: TextStyle(color: Colors.grey))
+        : Text(
+            'Last Seen: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(lastSeen)}',
+            style: const TextStyle(color: Colors.grey));
   }
 
   void _showImagePickerDialog() {
@@ -255,5 +262,18 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
         ],
       ),
     );
+  }
+
+
+  Color _getDistanceColor(double distance) {
+    if (distance <= 3) return Colors.green;
+    if (distance <= 5) return Colors.orange;
+    return Colors.red;
+  }
+
+  Color _getRssiColor(int rssi) {
+    if (rssi >= -60) return Colors.green;
+    if (rssi >= -80) return Colors.orange;
+    return Colors.red;
   }
 }

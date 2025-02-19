@@ -17,7 +17,7 @@ class AuthService {
       );
       return userCredential.user;
     } catch (e) {
-      print("Error signing in: $e");
+      debugPrint("Error signing in: $e");
       return null;
     }
   }
@@ -34,7 +34,7 @@ class AuthService {
       );
       return userCredential.user;
     } catch (e) {
-      print("Error registering user: $e");
+      debugPrint("Error registering user: $e");
       return null;
     }
   }
@@ -48,11 +48,11 @@ class AuthService {
         'lastSeen': FieldValue.serverTimestamp(),
       });
 
-      print("Device added to Firestore");
+      debugPrint("Device added to Firestore");
       fetchUserDevicesAndNavigate(context, user);
 
     } catch (e) {
-      print("Error adding device to Firestore: $e");
+      debugPrint("Error adding device to Firestore: $e");
     }
   }
 }

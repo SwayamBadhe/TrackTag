@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/foundation.dart';
 
 class GoogleSignInHelper {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -24,7 +25,7 @@ class GoogleSignInHelper {
 
       return userCredential.user;
     } catch (e) {
-      print("Error signing in with Google: $e");
+      debugPrint("Error signing in with Google: $e");
       return null;
     }
   }
@@ -34,7 +35,7 @@ class GoogleSignInHelper {
       await _googleSignIn.signOut(); 
       await _auth.signOut();         
     } catch (e) {
-      print("Error signing out: $e");
+      debugPrint("Error signing out: $e");
       rethrow; 
     }
   }

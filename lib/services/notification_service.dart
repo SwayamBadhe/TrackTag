@@ -1,6 +1,7 @@
 // lib/services/notification_service.dart
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
+import 'package:flutter/foundation.dart';
 
 class NotificationService {
   final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
@@ -17,7 +18,7 @@ class NotificationService {
           InitializationSettings(android: initializationSettingsAndroid);
       await _notificationsPlugin.initialize(initializationSettings);
     } catch (e) {
-      print('Error initializing notifications: $e');
+      debugPrint('Error initializing notifications: $e');
     }
   }
 

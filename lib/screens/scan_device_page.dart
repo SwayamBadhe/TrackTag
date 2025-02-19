@@ -5,8 +5,8 @@ import 'package:track_tag/services/bluetooth_service.dart';
 import 'package:track_tag/screens/register_device_page.dart';
 import 'package:track_tag/screens/device_info_card.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:track_tag/services/device_tracking_service.dart';
 
 class ScanDevicePage extends StatefulWidget {
   const ScanDevicePage({super.key});
@@ -29,15 +29,24 @@ class ScanDevicePageState extends State<ScanDevicePage> {
 
   Future<void> _startScanning() async {
     final bluetoothService = Provider.of<BluetoothService>(context, listen: false);
+    final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
+
     if (bluetoothService.flutterReactiveBle.status == BleStatus.ready) {
-      bluetoothService.startScan();
+      // Ensure we stop any existing scan before starting a new one
+      bluetoothService.stopScan();
+
+      // Wait a moment before starting a new scan (to prevent conflicts)
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      bluetoothService.startScan(trackingService);
       setState(() {
         _isScanning = true;
       });
     } else {
-      print("Bluetooth is not enabled.");
+      debugPrint("Bluetooth is not enabled.");
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -85,11 +94,13 @@ class ScanDevicePageState extends State<ScanDevicePage> {
                     ),
                   );
                 }
+                
+                final sortedDevices = List<DiscoveredDevice>.from(devices)..sort((a, b) => b.rssi.compareTo(a.rssi));
 
                 return ListView.builder(
-                  itemCount: devices.length,
+                  itemCount: sortedDevices.length,
                   itemBuilder: (context, index) {
-                    final device = devices[index];
+                    final device = sortedDevices[index];
                     return DeviceInfoCard(
                       key: ValueKey(device.id),
                       device: device,

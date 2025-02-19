@@ -1,14 +1,19 @@
 // lib/services/device_tracking_service.dart
 import 'dart:async';
-import 'dart:typed_data';
 import 'dart:math';
-
-import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:track_tag/models/device_tracking_info.dart';
-import 'package:vibration/vibration.dart';
 import 'package:track_tag/services/notification_service.dart';
+import 'package:track_tag/utils/kalman_filter.dart';
 
-class DeviceTrackingService {
+enum TrackedDeviceState {
+  disconnected,
+  connected,
+  lost
+}
+
+class DeviceTrackingService extends ChangeNotifier {
   final NotificationService notificationService;
   final Map<String, DeviceTrackingInfo> _deviceTracking = {};
   final Map<String, Timer> _activeSearchTimers = {};
@@ -16,142 +21,82 @@ class DeviceTrackingService {
   final Map<String, double> distanceMap = {};
   final Map<String, int> rssiMap = {};
   final Map<String, DateTime> lastSeenMap = {}; 
-  final Duration rssiTimeout = const Duration(seconds: 10);
 
+  static const Duration rssiTimeout = Duration(seconds: 10);
+  static const Duration checkInterval = Duration(seconds: 1);
   static const double LOST_THRESHOLD_METERS = 10.0;
   static const int ACTIVE_SEARCH_INTERVAL = 500;
-  int userDefinedRange = -90;
+
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  double userDefinedRange = 10.0; // Default range
+  final Map<String, KalmanFilter> filters = {};
 
   DeviceTrackingService(this.notificationService);
 
-  void checkDeviceStatus(String deviceId) {
-    final lastSeen = lastSeenMap[deviceId];
-    if (lastSeen == null || DateTime.now().difference(lastSeen) > rssiTimeout) {
-      print("⚠️ Device $deviceId is lost (RSSI timeout exceeded).");
-      trackLostDevice(deviceId);
+  Future<void> loadTrackingPreferences(String userId) async {
+    try {
+      DocumentSnapshot doc = await _firestore.collection('users').doc(userId).get();
+      if (doc.exists) {
+        userDefinedRange = doc['userDefinedRange'] ?? 5.0;
+      }
+    } catch (e) {
+      debugPrint("Error loading tracking preferences: $e");
     }
   }
 
-  void checkRssiTimeout() {
-    DateTime now = DateTime.now();
-    lastSeenMap.forEach((deviceId, lastSeen) {
-      if (now.difference(lastSeen) > rssiTimeout) {
-        print("🔴 RSSI timeout exceeded for device: $deviceId.");
-        trackLostDevice(deviceId);
-      }
-    });
+  Future<void> saveTrackingPreferences(String userId) async {
+    try {
+      await _firestore.collection('users').doc(userId).set({
+        'userDefinedRange': userDefinedRange,
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint("Error saving tracking preferences: $e");
+    }
+  }
+
+  KalmanFilter getKalmanFilter(String deviceId) {
+    filters.putIfAbsent(deviceId, () => KalmanFilter());
+    
+    // Cleanup old filters if last seen was long ago
+    if (lastSeenMap.containsKey(deviceId) &&
+        DateTime.now().difference(lastSeenMap[deviceId]!) > const Duration(minutes: 10)) {
+      filters.remove(deviceId);
+    }
+
+    return filters[deviceId]!;
   }
 
   DeviceTrackingInfo getDeviceTrackingInfo(String deviceId) {
-    return _deviceTracking.putIfAbsent(deviceId, () => DeviceTrackingInfo());
+    return _deviceTracking.putIfAbsent(deviceId, () => 
+      DeviceTrackingInfo(deviceId: deviceId, isTracking: false, lastSeen: DateTime.now()));
   }
 
   bool isDeviceTracking(String deviceId) {
     return _deviceTracking[deviceId]?.isTracking ?? false;
   }
 
-   Future<void> toggleTracking(String deviceId) async {
-    var trackingInfo = getDeviceTrackingInfo(deviceId);
-    trackingInfo.isTracking = !trackingInfo.isTracking;
-
-    if (trackingInfo.isTracking) {
-      startActiveSearch(deviceId);
-    } else {
-      _stopActiveSearch(deviceId);
-    }
+  // delete later
+  void debugDeviceTrackingState(String deviceId) {
+    debugPrint("🔍 DeviceTrackingInfo for $deviceId:");
+    debugPrint("   isTracking: ${_deviceTracking[deviceId]?.isTracking}");
+    debugPrint("   lastSeen: ${_deviceTracking[deviceId]?.lastSeen}");
   }
 
-  // Add trackLostDevice method
-  void trackLostDevice(String deviceId) {
-    if (!rssiMap.containsKey(deviceId)) {
-        print("Device $deviceId not found in scan data.");
-        return;
-    }
-
-    int rssi = rssiMap[deviceId] ?? -100;
-    double distance = distanceMap[deviceId] ?? -1.0;
-
-    print("Tracking lost device $deviceId...");
-    print("Last known RSSI: $rssi dBm, Estimated Distance: ${distance.toStringAsFixed(2)} meters");
-
-    // Check if the device is outside the user-defined range
-    if (rssi < userDefinedRange || distance < 0) {
-        print("🚨 Marking device $deviceId as lost.");
-        notificationService.showNotification(DiscoveredDevice(
-          id: deviceId,
-          name: "Lost Device",
-          manufacturerData: Uint8List(0),
-          rssi: rssi,
-          serviceUuids: const [],
-          serviceData: const {},
-        ));
-        
-        notificationService.showNotification(DiscoveredDevice(
-            id: deviceId,
-            name: "Lost Device",
-            manufacturerData: Uint8List(0),
-            rssi: rssi,
-            serviceUuids: const [],
-            serviceData: const {},
-        ));
-
-        Vibration.vibrate();
-        print("Device $deviceId is lost!");
-    }
+  // called in device_status_page
+  Future<void> toggleTracking(String deviceId) async {
+    debugDeviceTrackingState(deviceId);
+    debugDeviceTrackingState(deviceId);
   }
 
-  // Add these tracking-related methods from the original file
-  void startActiveSearch(String deviceId) {
-    var trackingInfo = getDeviceTrackingInfo(deviceId);
-    trackingInfo.activeTrackingTimer?.cancel();
-    
-    trackingInfo.activeTrackingTimer = Timer.periodic(
-      const Duration(milliseconds: ACTIVE_SEARCH_INTERVAL),
-      (_) => updateDeviceStatus(deviceId)
-    );
-  }
 
-  void _stopActiveSearch(String deviceId) {
-    _activeSearchTimers[deviceId]?.cancel();
-    _activeSearchTimers.remove(deviceId);
-  }
-
-  void updateDeviceStatus(String deviceId) {
-    var trackingInfo = getDeviceTrackingInfo(deviceId);
-    var currentDistance = getEstimatedDistance(deviceId);
-
-    // Update last seen timestamp
-    lastSeenMap[deviceId] = DateTime.now();
-
-    if (currentDistance > 0) {
-        if (trackingInfo.lastDistance > 0) {
-            double difference = currentDistance - trackingInfo.lastDistance;
-            if (difference.abs() > 0.5) {
-                trackingInfo.movementStatus = difference < 0 ? 'Getting Closer' : 'Moving Away';
-            } else {
-                trackingInfo.movementStatus = 'Stationary';
-            }
-        }
-
-        trackingInfo.isLost = currentDistance > LOST_THRESHOLD_METERS;
-        trackingInfo.lastDistance = currentDistance;
-        trackingInfo.lastSeen = DateTime.now();
-
-        // Trigger vibration alert if lost
-        if (trackingInfo.isLost && trackingInfo.isTracking) {
-            Vibration.vibrate();
-        }
-    }
-}
-
+/// *****************Distance Calculation*****************///
   double getEstimatedDistance(String deviceId) {
     return distanceMap[deviceId] ?? -1.0;
   }
 
- double calculateDistance(int? txPower, double rssi) {
-    if (txPower == null) txPower = -59; 
-    if (rssi == 0) return -1.0; 
-
+  double calculateDistance(int? txPower, double rssi) {
+    if (rssi >= 0 || rssi < -100) return -1.0; // Reject unrealistic values
+    txPower ??= -59; 
     const double pathLossExponent = 2.7; 
     return pow(10, (txPower - rssi) / (10 * pathLossExponent)).toDouble();
   }
@@ -178,10 +123,12 @@ class DeviceTrackingService {
     return rssiMap[deviceId] ?? -100;
   }
 
+  @override
   void dispose() {
     for (var timer in _activeSearchTimers.values) {
       timer.cancel();
     }
     _activeSearchTimers.clear();
+    super.dispose();
   }
 }

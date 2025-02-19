@@ -4,6 +4,7 @@ import 'package:track_tag/screens/auth/login_page.dart';
 import 'package:track_tag/utils/firestore_helper.dart';
 import 'services/bluetooth_service.dart';
 import 'services/device_tracking_service.dart';
+import 'services/background_service.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -17,8 +18,49 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  
+  final notificationService = NotificationService();
+  final deviceTrackingService = DeviceTrackingService(notificationService);
+  final bluetoothService = BluetoothService();
 
-  runApp(const MyApp());
+  // Start background service with proper dependencies
+  await initializeBackgroundService(notificationService, bluetoothService, deviceTrackingService);
+
+  runApp(const MyAppState());
+}
+
+class MyAppState extends StatefulWidget {
+  const MyAppState({super.key});
+
+  @override
+  State<MyAppState> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyAppState> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() async {
+    WidgetsBinding.instance.removeObserver(this);
+    await stopBackgroundService(); // Ensure background service stops properly
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.detached) {
+      stopBackgroundService(); // Ensure service stops when app is closed
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const MyApp();
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -44,13 +86,13 @@ class MyApp extends StatelessWidget {
           stream: FirebaseAuth.instance.authStateChanges(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const CircularProgressIndicator();
+              return const Center(child: CircularProgressIndicator());
             }
 
             if (snapshot.hasData) {
               final user = snapshot.data!;
               fetchUserDevicesAndNavigate(context, user);
-              return const CircularProgressIndicator();
+              return const Center(child: CircularProgressIndicator());
             } else {
               return const LoginPage();
             }

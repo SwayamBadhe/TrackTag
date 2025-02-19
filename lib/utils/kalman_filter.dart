@@ -16,4 +16,6 @@ class KalmanFilter {
     
     return _estimate;
   }
+  
+   double get latestValue => _estimate;
 }

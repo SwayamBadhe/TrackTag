@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:track_tag/services/device_tracking_service.dart';
-import 'package:track_tag/services/eddystone_parser.dart';
+import 'package:track_tag/utils/kalman_filter.dart';
 import 'package:vibration/vibration.dart';
 import 'package:track_tag/services/notification_service.dart';
 
@@ -29,103 +29,76 @@ class BluetoothScanner extends ChangeNotifier {
 
     bool hasPermission = await _checkAndRequestPermissions();
     if (!hasPermission) {
-      print("Bluetooth permissions not granted.");
+      debugPrint("Bluetooth permissions not granted.");
       return;
     }
 
     if (flutterReactiveBle.status != BleStatus.ready) {
-      print("Bluetooth is not ready. Requesting user to enable it...");
+      debugPrint("Bluetooth is not ready. Requesting user to enable it...");
       await _requestEnableBluetooth();
       return;
     }
 
     _isScanning = true;
     _scanSubscription = flutterReactiveBle.scanForDevices(
-      withServices: [],
-      scanMode: ScanMode.lowLatency,
+      withServices: [], // specific UUID services to scan for 
+      scanMode: ScanMode.lowLatency, 
       requireLocationServicesEnabled: true,
     ).listen(
       (device) => _processDiscoveredDevice(device, trackingService),
       onError: _handleScanError,
-      onDone: () => startScan(trackingService),
+      onDone: () async {
+        _isScanning = false;
+        await Future.delayed(const Duration(seconds: 5));
+        startScan(trackingService);
+      },
     );
   }
 
   void _processDiscoveredDevice(DiscoveredDevice device, DeviceTrackingService trackingService) {
-  try {
-    final String deviceId = device.id;
-    final String localName = device.name.isNotEmpty ? device.name : "Unknown";
-    final List<String> serviceUuids = device.serviceUuids.map((uuid) => uuid.toString()).toList();
-    final List<int> manufacturerData = device.manufacturerData;
-    final int rssi = device.rssi;
+    try {
+      final String deviceId = device.id;
+      final int rssi = device.rssi;
 
-    var trackingInfo = trackingService.getDeviceTrackingInfo(deviceId);
-    double filteredRssi = trackingInfo.rssiFilter.update(rssi.toDouble());
+      var filter = trackingService.getKalmanFilter(deviceId);
+      double filteredRssi = filter.update(rssi.toDouble());
 
-    int? txPower = trackingService.extractTxPower(manufacturerData);
-    double estimatedDistance = trackingService.calculateDistance(txPower, filteredRssi);
+      int? txPower = trackingService.extractTxPower(device.manufacturerData);
+      double estimatedDistance = trackingService.calculateDistance(txPower, filteredRssi);
 
-    // Store RSSI & estimated distance
-    trackingService.rssiMap[deviceId] = filteredRssi.toInt();
-    trackingService.distanceMap[deviceId] = estimatedDistance;
+      final double previousDistance = trackingService.distanceMap[deviceId] ?? -1.0;
+      final int previousRssi = trackingService.rssiMap[deviceId] ?? -100;
 
-    print('\n🔹 Device Found:');
-    print('ID: $deviceId');
-    print('Name: $localName');
-    print('RSSI: $rssi dBm (Filtered: ${filteredRssi.toStringAsFixed(1)})');
-    print('Estimated Distance: ${estimatedDistance.toStringAsFixed(2)} meters');
-
-    if (serviceUuids.isNotEmpty) {
-      print('   🔧 Service UUIDs:');
-      for (var uuid in serviceUuids) {
-        print('      - $uuid');
+      if ((filteredRssi - previousRssi).abs() < 1.5 && (estimatedDistance - previousDistance).abs() < 0.5) {
+        return; // No significant change, ignore
       }
-    }
 
-    if (manufacturerData.isNotEmpty) {
-      print('Manufacturer Data:');
-      print('- Raw: ${manufacturerData.map((b) => b.toRadixString(16).padLeft(2, '0')).join(':')}');
+      trackingService.rssiMap[deviceId] = filteredRssi.toInt();
+      trackingService.distanceMap[deviceId] = estimatedDistance;
 
-      try {
-        final eddystoneData = EddystoneParser.parseManufacturerData(manufacturerData);
-        if (eddystoneData != null) {
-          print('- Eddystone Format Detected:');
-          print('Frame Type: ${eddystoneData['frameType']}');
-        }
-      } catch (e) {
-        print('- Not Eddystone format');
+      debugPrint("📡 Device $deviceId: RSSI=$rssi, Filtered RSSI=$filteredRssi, Distance=$estimatedDistance");
+
+      // Update existing device or add new one
+      final existingDeviceIndex = _devices.indexWhere((d) => d.id == deviceId);
+      if (existingDeviceIndex >= 0) {
+        // Update existing device
+        _devices[existingDeviceIndex] = device;
+      } else {
+        // Add new device
+        _devices.add(device);
       }
+
+      _devicesController.add(_devices);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('❌ Error processing device: $e');
     }
-
-    // 🔹 Update and check device status
-    trackingService.updateDeviceStatus(deviceId);
-    trackingService.checkDeviceStatus(deviceId); 
-
-    // 🔹 Store device in the list (update or add new)
-    final existingDeviceIndex = _devices.indexWhere((d) => d.id == deviceId);
-    if (existingDeviceIndex == -1) {
-      _devices.add(device);
-    } else {
-      _devices[existingDeviceIndex] = device;
-    }
-
-    // Notify UI
-    _devicesController.add(_devices);
-    notifyListeners();
-
-    // 🔹 Alert user if within range
-    if (estimatedDistance < trackingService.userDefinedRange) {
-      _notificationService.showNotification(device);
-      Vibration.vibrate();
-    }
-  } catch (e) {
-    print('Error processing device data: $e');
   }
-}
 
-  void _handleScanError(dynamic error) {
-    print("❌ Scan error: $error");
+  void _handleScanError(dynamic error) async {
+    debugPrint("❌ Scan error: $error");
     _isScanning = false;
+    await Future.delayed(const Duration(seconds: 5));
   }
 
   Future<bool> _checkAndRequestPermissions() async {
@@ -135,6 +108,10 @@ class BluetoothScanner extends ChangeNotifier {
       Permission.location
     ].request();
 
+    for (var entry in statuses.entries) {
+      debugPrint("Permission ${entry.key}: ${entry.value}");
+    }
+
     return statuses.values.every((status) => status.isGranted);
   }
 
@@ -143,22 +120,22 @@ class BluetoothScanner extends ChangeNotifier {
     try {
       await platform.invokeMethod('requestEnableBluetooth');
     } on PlatformException catch (e) {
-      print("Failed to enable Bluetooth: ${e.message}");
+      debugPrint("Failed to enable Bluetooth: ${e.message}");
     }
   }
 
   Future<void> connectToDevice(String deviceId) async {
     try {
-      print("Connecting to $deviceId...");
+      debugPrint("Connecting to $deviceId...");
       final connectionStream = flutterReactiveBle.connectToDevice(id: deviceId);
 
       connectionStream.listen((connectionState) {
-        print("Connection state: ${connectionState.connectionState}");
+        debugPrint("Connection state: ${connectionState.connectionState}");
       }, onError: (error) {
-        print("Connection error: $error");
+        debugPrint("Connection error: $error");
       });
     } catch (e) {
-      print("Error connecting to device: $e");
+      debugPrint("Error connecting to device: $e");
     }
   }
 

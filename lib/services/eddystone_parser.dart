@@ -1,4 +1,5 @@
 // lib/services/eddystone_parser.dart
+import 'package:flutter/foundation.dart';
 
 class EddystoneParser {
   static const int EDDYSTONE_UUID = 0xFEAA;
@@ -30,7 +31,7 @@ class EddystoneParser {
           };
       }
     } catch (e) {
-      print('Error parsing Eddystone data: $e');
+      debugPrint('Error parsing Eddystone data: $e');
       return null;
     }
   }

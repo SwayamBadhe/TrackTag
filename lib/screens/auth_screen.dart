@@ -30,7 +30,7 @@ class AuthScreenState extends State<AuthScreen> {
         ),
       );
     } catch (e) {
-      print("Error signing in: $e");
+      debugPrint("Error signing in: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to sign in')),
       );

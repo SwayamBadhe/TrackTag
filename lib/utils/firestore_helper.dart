@@ -19,6 +19,6 @@ Future<void> fetchUserDevicesAndNavigate(BuildContext context, User user) async 
       ),
     );
   } catch (e) {
-    print("Error fetching user devices: $e");
+    debugPrint("Error fetching user devices: $e");
   }
 }

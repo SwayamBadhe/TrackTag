@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:track_tag/services/device_tracking_service.dart';
 import '../services/bluetooth_service.dart';
 
 class DeviceListScreen extends StatelessWidget {
@@ -14,8 +15,12 @@ class DeviceListScreen extends StatelessWidget {
       body: Column(
         children: [
           ElevatedButton(
-            onPressed:
-                bluetoothService.isScanning ? null : bluetoothService.startScan,
+            onPressed: bluetoothService.isScanning
+              ? null
+              : () {
+              final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
+              bluetoothService.startScan(trackingService);
+            },
             child: const Text("Start Scan"),
           ),
           ElevatedButton(
