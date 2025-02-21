@@ -1,14 +1,20 @@
 // lib/services/background_service.dart
 import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_background_service_android/flutter_background_service_android.dart';
 import 'package:track_tag/services/bluetooth_service.dart';
 import 'package:track_tag/services/device_tracking_service.dart';
 import 'package:track_tag/services/notification_service.dart';
 
+GlobalKey<NavigatorState>? _navigatorKey;
+
 Future<void> initializeBackgroundService(NotificationService notificationService, 
                                          BluetoothService bluetoothService, 
-                                         DeviceTrackingService trackingService) async {
+                                         DeviceTrackingService trackingService,
+                                         GlobalKey<NavigatorState> navigatorKey) async {
+                                        
+  _navigatorKey = navigatorKey;
   final service = FlutterBackgroundService();
 
   await service.configure(
@@ -30,8 +36,14 @@ Future<void> initializeBackgroundService(NotificationService notificationService
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
   final notificationService = NotificationService();
-  final trackingService = DeviceTrackingService(notificationService);
-  final bluetoothService = BluetoothService();
+  
+  if (_navigatorKey == null) {
+    debugPrint("NavigatorKey is null in background service.");
+    return;
+  }
+
+  final trackingService = DeviceTrackingService(notificationService, _navigatorKey!);
+  final bluetoothService = BluetoothService(_navigatorKey!);
 
   if (service is AndroidServiceInstance) {
     service.setForegroundNotificationInfo(

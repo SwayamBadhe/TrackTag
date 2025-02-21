@@ -24,7 +24,6 @@ class DeviceStatusPage extends StatefulWidget {
 class DeviceStatusPageState extends State<DeviceStatusPage> {
   final TextEditingController _descriptionController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
-  late DeviceTrackingService _deviceTrackingService;
   late NotificationService notificationService;
   XFile? _profileImage;
   bool isTracking = false;
@@ -34,7 +33,6 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
     super.initState();
     notificationService = NotificationService();
     _loadTrackingState();
-    _deviceTrackingService = DeviceTrackingService(notificationService);
   }
 
   @override
@@ -44,29 +42,22 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
   }
 
   Future<void> _loadTrackingState() async {
-    final prefs = await SharedPreferences.getInstance();
+    final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
     setState(() {
-      isTracking = prefs.getBool('tracking_${widget.deviceId}') ?? false;
-      debugPrint("Tracking state for ${widget.deviceId}: $isTracking");
+      isTracking = trackingService.isDeviceTracking(widget.deviceId);
     });
+    debugPrint("Loaded tracking state for ${widget.deviceId}: $isTracking");
   }
 
   Future<void> _toggleTracking() async {
-    final deviceTrackingService = Provider.of<DeviceTrackingService>(context, listen: false);
-    await deviceTrackingService.toggleTracking(widget.deviceId);
-
-    debugPrint("🛠️ Checking tracking state after toggle: ${deviceTrackingService.isDeviceTracking(widget.deviceId)}");
-
-    final prefs = await SharedPreferences.getInstance();
-    bool? storedTrackingState = prefs.getBool('tracking_${widget.deviceId}');
-    
-    debugPrint("🛠️ Stored tracking state: $storedTrackingState");
+    final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
+    await trackingService.toggleTracking(widget.deviceId);
 
     setState(() {
-      isTracking = storedTrackingState ?? false;
+      isTracking = trackingService.isDeviceTracking(widget.deviceId);
     });
 
-    debugPrint("🛠️ UI Updated: isTracking = $isTracking");
+    debugPrint("🛠️ Tracking toggled: ${widget.deviceId} = $isTracking");
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -83,7 +74,6 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
   @override
   Widget build(BuildContext context) {
     final bluetoothService = Provider.of<BluetoothService>(context);
-    final trackingService = Provider.of<DeviceTrackingService>(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Device Status')),
@@ -137,11 +127,15 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
                           (devices) => devices.where((d) => d.id == widget.deviceId).toList(),
                         ),
                         builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator());
+                          }
+
                           final trackingInfo = bluetoothService.getDeviceTrackingInfo(widget.deviceId);
                           final distance = bluetoothService.getEstimatedDistance(widget.deviceId);
                           final rssi = bluetoothService.getSmoothedRssi(widget.deviceId);
-                          const connectionState = null;
-                          
+                          final connectionState = bluetoothService.getConnectionState(widget.deviceId);
+
                           return Column(
                             children: [
                               _buildConnectionStatus(connectionState),

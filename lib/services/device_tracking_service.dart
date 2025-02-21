@@ -3,7 +3,11 @@ import 'dart:async';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:track_tag/models/device_tracking_info.dart';
+import 'package:track_tag/services/bluetooth_service.dart';
 import 'package:track_tag/services/notification_service.dart';
 import 'package:track_tag/utils/kalman_filter.dart';
 
@@ -15,12 +19,15 @@ enum TrackedDeviceState {
 
 class DeviceTrackingService extends ChangeNotifier {
   final NotificationService notificationService;
+  final GlobalKey<NavigatorState> navigatorKey;
+  
   final Map<String, DeviceTrackingInfo> _deviceTracking = {};
   final Map<String, Timer> _activeSearchTimers = {};
   final Map<String, List<int>> _rssiHistory = {};
   final Map<String, double> distanceMap = {};
   final Map<String, int> rssiMap = {};
   final Map<String, DateTime> lastSeenMap = {}; 
+  final Set<String> _trackedDevices = {};
 
   static const Duration rssiTimeout = Duration(seconds: 10);
   static const Duration checkInterval = Duration(seconds: 1);
@@ -31,7 +38,7 @@ class DeviceTrackingService extends ChangeNotifier {
   double userDefinedRange = 10.0; // Default range
   final Map<String, KalmanFilter> filters = {};
 
-  DeviceTrackingService(this.notificationService);
+  DeviceTrackingService(this.notificationService, this.navigatorKey);
 
   Future<void> loadTrackingPreferences(String userId) async {
     try {
@@ -72,8 +79,10 @@ class DeviceTrackingService extends ChangeNotifier {
   }
 
   bool isDeviceTracking(String deviceId) {
-    return _deviceTracking[deviceId]?.isTracking ?? false;
+    return _trackedDevices.contains(deviceId);
   }
+
+  Set<String> getTrackedDevices() => _trackedDevices;
 
   // delete later
   void debugDeviceTrackingState(String deviceId) {
@@ -85,9 +94,43 @@ class DeviceTrackingService extends ChangeNotifier {
   // called in device_status_page
   Future<void> toggleTracking(String deviceId) async {
     debugDeviceTrackingState(deviceId);
+    final prefs = await SharedPreferences.getInstance();
+
+    bool wasTracking = _trackedDevices.contains(deviceId);
+
+    if (_trackedDevices.contains(deviceId)) {
+      _trackedDevices.remove(deviceId);
+      await prefs.setBool('tracking_$deviceId', false);
+    } else {
+      _trackedDevices.add(deviceId);
+      await prefs.setBool('tracking_$deviceId', true);
+    }
+    notifyListeners();
     debugDeviceTrackingState(deviceId);
+
+    if (!wasTracking) {
+      final bluetoothService = Provider.of<BluetoothService>(navigatorKey.currentContext!, listen: false);
+      bluetoothService.startScan(this, isForScanAll: false);
+    }
   }
 
+TrackedDeviceState getConnectionState(String deviceId) {
+  final isTracked = isDeviceTracking(deviceId);
+
+  if (!isTracked) {
+    return TrackedDeviceState.disconnected;
+  }
+
+  final rssi = getSmoothedRssi(deviceId);
+
+  if (rssi == 0) {
+    return TrackedDeviceState.lost; // No signal detected
+  } else if (rssi > -100) {
+    return TrackedDeviceState.connected; // Strong signal
+  } else {
+    return TrackedDeviceState.disconnected; // Weak or no connection
+  }
+}
 
 /// *****************Distance Calculation*****************///
   double getEstimatedDistance(String deviceId) {

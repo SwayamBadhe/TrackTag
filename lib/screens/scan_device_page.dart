@@ -55,7 +55,7 @@ class ScanDevicePageState extends State<ScanDevicePage> {
       // Wait a moment before starting a new scan (to prevent conflicts)
       await Future.delayed(const Duration(milliseconds: 500));
 
-      bluetoothService.startScan(trackingService);
+      bluetoothService.startScan(trackingService, isForScanAll: true);
       setState(() {
         _isScanning = true;
       });

@@ -24,7 +24,8 @@ class BluetoothScanner extends ChangeNotifier {
   List<DiscoveredDevice> get devices => List.unmodifiable(_devices);
   bool get isScanning => _isScanning;
 
-  Future<void> startScan(DeviceTrackingService trackingService) async {
+  Future<void> startScan(DeviceTrackingService trackingService, bool isForScanAll) async {
+
     if (_isScanning) return;
 
     bool hasPermission = await _checkAndRequestPermissions();
@@ -45,12 +46,12 @@ class BluetoothScanner extends ChangeNotifier {
       scanMode: ScanMode.lowLatency, 
       requireLocationServicesEnabled: true,
     ).listen(
-      (device) => _processDiscoveredDevice(device, trackingService),
+      (device) => _processDiscoveredDevice(device, trackingService, isForScanAll),
       onError: _handleScanError,
       onDone: () async {
         if (_isScanning) { 
           await Future.delayed(const Duration(seconds: 5));
-          startScan(trackingService);
+          startScan(trackingService, isForScanAll);
         } else {
           debugPrint("Scan stopped manually, not restarting.");
           notifyListeners();
@@ -59,8 +60,12 @@ class BluetoothScanner extends ChangeNotifier {
     );
   }
 
-  void _processDiscoveredDevice(DiscoveredDevice device, DeviceTrackingService trackingService) {
+  void _processDiscoveredDevice(DiscoveredDevice device, DeviceTrackingService trackingService, bool isForScanAll) {
     try {
+      if (!isForScanAll && !trackingService.getTrackedDevices().contains(device.id)) {
+        return; // Ignore untracked devices when scanning for tracking
+      }
+
       final String deviceId = device.id;
       final int rssi = device.rssi;
 

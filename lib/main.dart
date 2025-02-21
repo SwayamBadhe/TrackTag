@@ -18,13 +18,15 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   
   final notificationService = NotificationService();
-  final deviceTrackingService = DeviceTrackingService(notificationService);
-  final bluetoothService = BluetoothService();
+  final deviceTrackingService = DeviceTrackingService(notificationService, navigatorKey);
+  final bluetoothService = BluetoothService(navigatorKey);
 
   // Start background service with proper dependencies
-  await initializeBackgroundService(notificationService, bluetoothService, deviceTrackingService);
+  await initializeBackgroundService(notificationService, bluetoothService, deviceTrackingService, navigatorKey);
 
   runApp(const MyAppState());
 }
@@ -59,22 +61,25 @@ class _MyAppState extends State<MyAppState> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return const MyApp();
+    return MyApp(navigatorKey: GlobalKey<NavigatorState>());
   }
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final GlobalKey<NavigatorState> navigatorKey;
+
+  const MyApp({super.key, required this.navigatorKey});
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => BluetoothService()),
+        ChangeNotifierProvider(create: (_) => BluetoothService(navigatorKey)),
         Provider(create: (_) => NotificationService()), 
         ChangeNotifierProvider(
           create: (context) => DeviceTrackingService(
             Provider.of<NotificationService>(context, listen: false), 
+            navigatorKey, 
           ),
         ),
       ],
@@ -82,6 +87,7 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         title: 'TrackTag App',
         theme: ThemeData(primarySwatch: Colors.teal),
+        navigatorKey: navigatorKey,
         home: StreamBuilder<User?>(
           stream: FirebaseAuth.instance.authStateChanges(),
           builder: (context, snapshot) {

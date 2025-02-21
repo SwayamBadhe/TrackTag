@@ -13,6 +13,7 @@ import 'package:track_tag/services/auth_service.dart';
 import 'package:track_tag/models/device_tracking_info.dart';
 
 class BluetoothService extends ChangeNotifier {
+  final GlobalKey<NavigatorState> navigatorKey;
   final FlutterReactiveBle flutterReactiveBle = FlutterReactiveBle();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore db = FirebaseFirestore.instance;
@@ -27,10 +28,10 @@ class BluetoothService extends ChangeNotifier {
   Stream<List<DiscoveredDevice>> get deviceStream => _bluetoothScanner.deviceStream;
   List<DiscoveredDevice> get devices => _bluetoothScanner.devices;
 
-  BluetoothService() {
+  BluetoothService(this.navigatorKey) {
     _notificationService = NotificationService();
     _bluetoothScanner = BluetoothScanner(flutterReactiveBle, _notificationService);
-    _deviceTrackingService = DeviceTrackingService(_notificationService);
+    _deviceTrackingService = DeviceTrackingService(_notificationService, navigatorKey);
     _authService = AuthService(_auth);
     _initializeBluetoothMonitoring();
   }
@@ -55,14 +56,14 @@ class BluetoothService extends ChangeNotifier {
     }
   }
 
-  Future<void> startScan(DeviceTrackingService trackingService) async {
+  Future<void> startScan(DeviceTrackingService trackingService, {bool isForScanAll = false}) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     await trackingService.loadTrackingPreferences(user.uid);
 
     if (!isScanning) {
-      await _bluetoothScanner.startScan(trackingService);
+      await _bluetoothScanner.startScan(trackingService, isForScanAll);
       notifyListeners();
     }
   }
@@ -102,6 +103,10 @@ class BluetoothService extends ChangeNotifier {
 
   Future<void> disconnectDevice() async {
     debugPrint("Device disconnected.");
+  }
+
+  TrackedDeviceState getConnectionState(String deviceId) {
+    return _deviceTrackingService.getConnectionState(deviceId);
   }
 
    double getEstimatedDistance(String deviceId) =>
