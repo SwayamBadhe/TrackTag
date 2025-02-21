@@ -30,6 +30,8 @@ class DeviceTrackingService extends ChangeNotifier {
   final Map<String, int> rssiMap = {};
   final Map<String, DateTime> lastSeenMap = {}; 
   final Set<String> _trackedDevices = {};
+  final Map<String, bool> _lostModeMap = {}; 
+  final Map<String, int> _lastRssiForLostMode = {};
   final Map<String, TrackedDeviceState> _lastKnownState = {};
 
   static const Duration rssiTimeout = Duration(seconds: 30);
@@ -66,8 +68,16 @@ class DeviceTrackingService extends ChangeNotifier {
       DocumentSnapshot doc = await _firestore.collection('users').doc(userId).get();
       if (doc.exists) {
         userDefinedRange = (doc['userDefinedRange'] as num?)?.toDouble() ?? 15.0;
-      }
-      notifyListeners();
+        final trackedDevicesSnapshot = await _firestore
+              .collection('users')
+              .doc(userId)
+              .collection('trackedDevices')
+              .get();
+          for (var doc in trackedDevicesSnapshot.docs) {
+            _lostModeMap[doc.id] = doc['lostMode'] ?? false;
+          }
+        }
+        notifyListeners();
     } catch (e) {
       debugPrint("Error loading tracking preferences: $e");
     }
@@ -96,12 +106,15 @@ class DeviceTrackingService extends ChangeNotifier {
 
   bool isDeviceTracking(String deviceId) => _trackedDevices.contains(deviceId);
 
+  bool isDeviceInLostMode(String deviceId) => _lostModeMap[deviceId] ?? false;
+
   Set<String> getTrackedDevices() => _trackedDevices;
 
   // delete later
   void debugDeviceTrackingState(String deviceId) {
     debugPrint("🔍 DeviceTrackingInfo for $deviceId:");
     debugPrint("   isTracking: ${_deviceTracking[deviceId]?.isTracking}");
+    debugPrint("   lostMode: ${_lostModeMap[deviceId]}");
     debugPrint("   lastSeen: ${_deviceTracking[deviceId]?.lastSeen}");
     debugPrint("   distance: ${distanceMap[deviceId]}");
     debugPrint("   rssi: ${rssiMap[deviceId]}");
@@ -118,7 +131,6 @@ class DeviceTrackingService extends ChangeNotifier {
 
     if (_trackedDevices.contains(deviceId)) {
       await _saveDeviceStateToFirebase(deviceId);
-      
       _trackedDevices.remove(deviceId);
       trackingInfo.isTracking = false;
       await prefs.setBool('tracking_$deviceId', false);
@@ -136,6 +148,34 @@ class DeviceTrackingService extends ChangeNotifier {
     debugDeviceTrackingState(deviceId);
   }
 
+  Future<void> toggleLostMode(String deviceId, bool enableLostMode) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    _lostModeMap[deviceId] = enableLostMode;
+    await _saveDeviceStateToFirebase(deviceId); 
+    notifyListeners();
+
+    if (enableLostMode && isDeviceTracking(deviceId)) {
+      _lastRssiForLostMode[deviceId] = getSmoothedRssi(deviceId); 
+    }
+  }
+
+  String getLostModeDirection(String deviceId) {
+    if (!isDeviceInLostMode(deviceId) || !isDeviceTracking(deviceId)) return "N/A";
+    
+    final currentRssi = getSmoothedRssi(deviceId);
+    final lastRssi = _lastRssiForLostMode[deviceId] ?? currentRssi;
+
+    if (currentRssi > lastRssi) {
+      return "Moving Closer";
+  } else if (currentRssi < lastRssi) {
+      return "Moving Away";
+    } else {
+      return "No Change";
+    }
+  }
+
   TrackedDeviceState getConnectionState(String deviceId) {
     final isTracked = isDeviceTracking(deviceId);
 
@@ -147,18 +187,23 @@ class DeviceTrackingService extends ChangeNotifier {
     final rssi = getSmoothedRssi(deviceId);
     final distance = getEstimatedDistance(deviceId);
 
-    if (lastSeen == null || DateTime.now().difference(lastSeen) > rssiTimeout) return TrackedDeviceState.disconnected;  
+    if (lastSeen == null || DateTime.now().difference(lastSeen) > rssiTimeout) {
+      return TrackedDeviceState.disconnected;  
+    }
 
-    if (distance > userDefinedRange && distance >= 0 && rssi > -100) return TrackedDeviceState.lost;
+    if (distance > userDefinedRange && distance >= 0 && rssi > -100) {
+      return TrackedDeviceState.lost;
+    }
 
-    if (rssi > -100) return TrackedDeviceState.connected;
+    if (rssi > -100) {
+      return TrackedDeviceState.connected;
+    }
 
     return TrackedDeviceState.disconnected;
   }
 
   void _updateTrackingStates() async {
     for (var deviceId in _trackedDevices) {
-      final lastSeen = lastSeenMap[deviceId];
       final currentState = getConnectionState(deviceId);
       final previousState = _lastKnownState[deviceId] ?? TrackedDeviceState.disconnected;
 
@@ -169,9 +214,14 @@ class DeviceTrackingService extends ChangeNotifier {
         }
       }
 
-      if (lastSeen == null || DateTime.now().difference(lastSeen) > rssiTimeout) {
-        notifyListeners();
+      // Update Lost Mode direction if active
+      if (isDeviceInLostMode(deviceId) && currentState == TrackedDeviceState.connected) {
+        final currentRssi = getSmoothedRssi(deviceId);
+        if (_lastRssiForLostMode.containsKey(deviceId)) {
+          _lastRssiForLostMode[deviceId] = currentRssi;
+        }
       }
+      notifyListeners();
     }
   }
 

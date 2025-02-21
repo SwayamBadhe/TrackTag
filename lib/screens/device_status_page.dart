@@ -46,8 +46,14 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
 
   Future<void> _loadTrackingState() async {
     final bluetoothService = Provider.of<BluetoothService>(context, listen: false);
+    final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId != null) {
+      await trackingService.loadTrackingPreferences(userId);
+    }
     setState(() {
       isTracking = bluetoothService.getDeviceTrackingInfo(widget.deviceId).isTracking;
+      _tempRange = trackingService.userDefinedRange;
     });
   }
 
@@ -78,6 +84,12 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
       await trackingService.saveTrackingPreferences(userId);
     }
     trackingService.notifyListeners();
+  }
+
+  Future<void> _toggleLostMode(bool value) async {
+    final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
+    await trackingService.toggleLostMode(widget.deviceId, value);
+    setState(() {}); // Refresh UI
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -138,6 +150,15 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
             ),
             if (isTracking) ...[
               const SizedBox(height: 16),
+              SwitchListTile(
+                title: const Text('Lost Mode'),
+                subtitle: Text(trackingService.isDeviceInLostMode(widget.deviceId)
+                    ? 'Finding device with navigation'
+                    : 'Default find mode'),
+                value: trackingService.isDeviceInLostMode(widget.deviceId),
+                onChanged: (value) => _toggleLostMode(value),
+              ),
+              const SizedBox(height: 16),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -150,6 +171,7 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
                           final distance = trackingService.getEstimatedDistance(widget.deviceId);
                           final rssi = trackingService.getSmoothedRssi(widget.deviceId);
                           final lastSeen = trackingService.lastSeenMap[widget.deviceId];
+                          final direction = trackingService.getLostModeDirection(widget.deviceId);
 
                           return Column(
                             children: [
@@ -164,6 +186,11 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
                                 _getRssiColor(rssi)),
                               const SizedBox(height: 16),
                               _buildLastSeen(lastSeen),
+                              if (trackingService.isDeviceInLostMode(widget.deviceId)) ...[
+                                const SizedBox(height: 16),
+                                _buildStatusRow('Direction', direction, Colors.blue),
+                                const SizedBox(height: 16),                                
+                              ],
                             ],
                           );
                         },
@@ -181,7 +208,7 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
                             _tempRange = value;
                           });
                         },
-                        onChangeEnd: (value) => _updateRange(value), // Save on release
+                        onChangeEnd: (value) => _updateRange(value),
                       ),
                     ],
                   ),

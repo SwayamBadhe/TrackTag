@@ -71,6 +71,7 @@ class ScanDevicePageState extends State<ScanDevicePage> {
   @override
   Widget build(BuildContext context) {
     final bluetoothService = Provider.of<BluetoothService>(context);
+    final trackingService = Provider.of<DeviceTrackingService>(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Scan Device')),
@@ -130,6 +131,7 @@ class ScanDevicePageState extends State<ScanDevicePage> {
                   itemCount: sortedDevices.length,
                   itemBuilder: (context, index) {
                     final device = sortedDevices[index];
+                    final isLost = trackingService.isDeviceInLostMode(device.id);
                     return DeviceInfoCard(
                       key: ValueKey(device.id),
                       device: device,
@@ -139,6 +141,7 @@ class ScanDevicePageState extends State<ScanDevicePage> {
                           _deviceIdController.text = deviceId;
                         });
                       },
+                      trailing: isLost ? const Icon(Icons.warning, color: Colors.orange) : null,
                     );
                   },
                 );

@@ -4,6 +4,7 @@ import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 class DeviceInfoCard extends StatelessWidget {
   final DiscoveredDevice device;
   final Function(String) onDeviceSelected;
+  final Widget? trailing;
 
   final double? estimatedDistance;
   final int smoothedRssi;
@@ -14,6 +15,7 @@ class DeviceInfoCard extends StatelessWidget {
     this.estimatedDistance,
     required this.smoothedRssi,
     required this.onDeviceSelected,
+    this.trailing,
   });
 
 
@@ -35,6 +37,7 @@ class DeviceInfoCard extends StatelessWidget {
             color: _getRssiColor(device.rssi),
           ),
         ),
+        trailing: trailing,
         leading: Icon(
           Icons.bluetooth,
           color: _getRssiColor(device.rssi),
