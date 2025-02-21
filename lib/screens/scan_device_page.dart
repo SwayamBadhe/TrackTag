@@ -20,50 +20,53 @@ class ScanDevicePageState extends State<ScanDevicePage> {
   String? _scannedData;
   bool _isScanning = false;
   bool _isConnecting = false;
+  late BluetoothService? _bluetoothService;
 
   @override
   void initState() {
     super.initState();
-    final bluetoothService = Provider.of<BluetoothService>(context, listen: false);
-    bluetoothService.addListener(_updateScanningState);
+    _bluetoothService = Provider.of<BluetoothService>(context, listen: false);
+    _bluetoothService?.addListener(_updateScanningState);
   }
 
   void _updateScanningState() {
-    final bluetoothService = Provider.of<BluetoothService>(context, listen: false);
-    if (mounted) {
+    if (mounted && _bluetoothService != null) {
       setState(() {
-        _isScanning = bluetoothService.isScanning;
+        _isScanning = _bluetoothService!.isScanning;
       });
     }
   }
 
   @override
   void dispose() {
-    final bluetoothService = Provider.of<BluetoothService>(context, listen: false);
-    bluetoothService.removeListener(_updateScanningState);
+    _bluetoothService?.removeListener(_updateScanningState);
+    _deviceIdController.dispose();
     super.dispose();
   }
 
   Future<void> _startScanning() async {
-    final bluetoothService = Provider.of<BluetoothService>(context, listen: false);
     final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
-
-    if (bluetoothService.flutterReactiveBle.status == BleStatus.ready) {
-      // Ensure we stop any existing scan before starting a new one
-      bluetoothService.stopScan();
-
-      // Wait a moment before starting a new scan (to prevent conflicts)
+    if (_bluetoothService?.flutterReactiveBle.status == BleStatus.ready) {
+      _bluetoothService?.stopScan();
       await Future.delayed(const Duration(milliseconds: 500));
-
-      bluetoothService.startScan(trackingService, isForScanAll: true);
-      setState(() {
-        _isScanning = true;
-      });
+      try {
+        _bluetoothService?.startScan(trackingService, isForScanAll: true);
+        setState(() {
+          _isScanning = true;
+        });
+      } catch (e) {
+        debugPrint("Failed to start scan: $e");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to start scanning: $e')),
+        );
+      }
     } else {
       debugPrint("Bluetooth is not enabled.");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enable Bluetooth')),
+      );
     }
   }
-
 
   @override
   Widget build(BuildContext context) {

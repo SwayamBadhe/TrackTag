@@ -44,9 +44,8 @@ class BluetoothService extends ChangeNotifier {
 
   Future<void> toggleTracking(String deviceId) async {
     try {
-      await _deviceTrackingService.toggleTracking(deviceId);
+      await _deviceTrackingService.toggleTracking(deviceId, this);
       await Future.delayed(const Duration(milliseconds: 50));
-      
       if (_deviceTrackingService.isDeviceTracking(deviceId)) {
         await startScan(_deviceTrackingService);
       }

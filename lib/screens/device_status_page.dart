@@ -1,3 +1,4 @@
+// lib/pages/device_status_page.dart
 import 'dart:io';
 import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
@@ -42,28 +43,32 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
   }
 
   Future<void> _loadTrackingState() async {
-    final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
+    final bluetoothService = Provider.of<BluetoothService>(context, listen: false);
     setState(() {
-      isTracking = trackingService.isDeviceTracking(widget.deviceId);
+      isTracking = bluetoothService.getDeviceTrackingInfo(widget.deviceId).isTracking;
     });
-    debugPrint("Loaded tracking state for ${widget.deviceId}: $isTracking");
   }
 
   Future<void> _toggleTracking() async {
+    final bluetoothService = Provider.of<BluetoothService>(context, listen: false);
     final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
-    await trackingService.toggleTracking(widget.deviceId);
 
-    setState(() {
-      isTracking = trackingService.isDeviceTracking(widget.deviceId);
-    });
-
-    debugPrint("🛠️ Tracking toggled: ${widget.deviceId} = $isTracking");
+    try {
+      await trackingService.toggleTracking(widget.deviceId, bluetoothService);
+      if (mounted) {
+        setState(() {
+          isTracking = trackingService.isDeviceTracking(widget.deviceId);
+        });
+      }
+    } catch (e) {
+      debugPrint("Error toggling tracking: $e");
+    }
   }
 
   Future<void> _pickImage(ImageSource source) async {
     try {
       final pickedFile = await _picker.pickImage(source: source);
-      if (pickedFile != null) {
+      if (pickedFile != null && mounted) {
         setState(() => _profileImage = pickedFile);
       }
     } catch (e) {
@@ -74,6 +79,7 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
   @override
   Widget build(BuildContext context) {
     final bluetoothService = Provider.of<BluetoothService>(context);
+    final trackingService = Provider.of<DeviceTrackingService>(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Device Status')),
@@ -110,8 +116,8 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
             SwitchListTile(
               title: const Text('Enable Tracking'),
               subtitle: Text(isTracking 
-                  ? 'Device is being monitored' 
-                  : 'Device tracking is disabled'),
+                  ? 'Monitoring device status' 
+                  : 'Tracking disabled'),
               value: isTracking,
               onChanged: (value) => _toggleTracking(),
             ),
@@ -120,41 +126,30 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      StreamBuilder<List<DiscoveredDevice>>(
-                        stream: bluetoothService.deviceStream.map(
-                          (devices) => devices.where((d) => d.id == widget.deviceId).toList(),
-                        ),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState == ConnectionState.waiting) {
-                            return const Center(child: CircularProgressIndicator());
-                          }
+                  child: StreamBuilder<List<DiscoveredDevice>>(
+                    stream: bluetoothService.deviceStream,
+                    builder: (context, snapshot) {
+                      final connectionState = trackingService.getConnectionState(widget.deviceId);
+                      final distance = trackingService.getEstimatedDistance(widget.deviceId);
+                      final rssi = trackingService.getSmoothedRssi(widget.deviceId);
+                      final lastSeen = trackingService.lastSeenMap[widget.deviceId];
 
-                          final trackingInfo = bluetoothService.getDeviceTrackingInfo(widget.deviceId);
-                          final distance = bluetoothService.getEstimatedDistance(widget.deviceId);
-                          final rssi = bluetoothService.getSmoothedRssi(widget.deviceId);
-                          final connectionState = bluetoothService.getConnectionState(widget.deviceId);
-
-                          return Column(
-                            children: [
-                              _buildConnectionStatus(connectionState),
-                              const SizedBox(height: 16),
-                              _buildStatusRow('Movement', trackingInfo.movementStatus, 
-                                  trackingInfo.movementStatus == 'Stationary' ? Colors.green : Colors.orange),
-                              const SizedBox(height: 8),
-                              _buildStatusRow('Distance', '${distance.toStringAsFixed(2)} meters', 
-                                  _getDistanceColor(distance)),
-                              const SizedBox(height: 8),
-                              _buildStatusRow('Signal Strength', '$rssi dBm', 
-                                  _getRssiColor(rssi)),
-                              const SizedBox(height: 16),
-                              _buildLastSeen(trackingInfo.lastSeen),
-                            ],
-                          );
-                        },
-                      ),
-                    ],
+                      return Column(
+                        children: [
+                          _buildConnectionStatus(connectionState),
+                          const SizedBox(height: 16),
+                          _buildStatusRow('Distance', 
+                            distance >= 0 ? '${distance.toStringAsFixed(2)} m' : 'Unknown',
+                            _getDistanceColor(distance)),
+                          const SizedBox(height: 8),
+                          _buildStatusRow('Signal Strength', 
+                            '$rssi dBm',
+                            _getRssiColor(rssi)),
+                          const SizedBox(height: 16),
+                          _buildLastSeen(lastSeen),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
@@ -162,24 +157,6 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
           ],
         ),
       ),
-    );
-  }
-
-
-Widget _buildStatusRow(String label, String value, Color color) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 16)),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-      ],
     );
   }
 
@@ -201,7 +178,7 @@ Widget _buildStatusRow(String label, String value, Color color) {
         break;
       case TrackedDeviceState.lost:
         icon = Icons.warning;
-        text = "Device Lost";
+        text = "Lost";
         color = Colors.orange;
         break;
     }
@@ -223,12 +200,28 @@ Widget _buildStatusRow(String label, String value, Color color) {
     );
   }
 
+  Widget _buildStatusRow(String label, String value, Color color) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 16)),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildLastSeen(DateTime? lastSeen) {
-    return lastSeen == null
-        ? const Text('Last Seen: Unknown', style: TextStyle(color: Colors.grey))
-        : Text(
-            'Last Seen: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(lastSeen)}',
-            style: const TextStyle(color: Colors.grey));
+    return Text(
+      'Last Seen: ${lastSeen != null ? DateFormat('yyyy-MM-dd HH:mm:ss').format(lastSeen) : 'Unknown'}',
+      style: const TextStyle(color: Colors.grey),
+    );
   }
 
   void _showImagePickerDialog() {
@@ -258,8 +251,8 @@ Widget _buildStatusRow(String label, String value, Color color) {
     );
   }
 
-
   Color _getDistanceColor(double distance) {
+    if (distance < 0) return Colors.grey;
     if (distance <= 3) return Colors.green;
     if (distance <= 5) return Colors.orange;
     return Colors.red;

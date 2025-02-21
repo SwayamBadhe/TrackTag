@@ -35,34 +35,50 @@ class BluetoothScanner extends ChangeNotifier {
     }
 
     if (flutterReactiveBle.status != BleStatus.ready) {
-      debugPrint("Bluetooth is not ready. Requesting user to enable it...");
+      debugPrint("Bluetooth not ready: ${flutterReactiveBle.status}. Requesting enable...");
       await _requestEnableBluetooth();
-      return;
+      await Future.delayed(const Duration(seconds: 2));
+      if (flutterReactiveBle.status != BleStatus.ready) {
+        debugPrint("Bluetooth still not ready: ${flutterReactiveBle.status}");
+        return;
+      }
     }
 
-    _isScanning = true;
-    _scanSubscription = flutterReactiveBle.scanForDevices(
-      withServices: [], // specific UUID services to scan for 
-      scanMode: ScanMode.lowLatency, 
-      requireLocationServicesEnabled: true,
-    ).listen(
-      (device) => _processDiscoveredDevice(device, trackingService, isForScanAll),
-      onError: _handleScanError,
-      onDone: () async {
-        if (_isScanning) { 
-          await Future.delayed(const Duration(seconds: 5));
-          startScan(trackingService, isForScanAll);
-        } else {
-          debugPrint("Scan stopped manually, not restarting.");
-          notifyListeners();
-        }
-      },
-    );
+    try {
+      _isScanning = true;
+      notifyListeners();
+
+      _scanSubscription?.cancel(); // Ensure no lingering subscription
+      _scanSubscription = flutterReactiveBle.scanForDevices(
+        withServices: [], // Empty list to scan all devices, filter in processing
+        scanMode: ScanMode.lowLatency,
+        requireLocationServicesEnabled: true,
+      ).listen(
+        (device) => _processDiscoveredDevice(device, trackingService, isForScanAll),
+        onError: _handleScanError,
+        onDone: () async {
+          debugPrint("Scan completed.");
+          if (_isScanning) {
+            await Future.delayed(const Duration(seconds: 1)); // Reduced delay for continuity
+            startScan(trackingService, isForScanAll);
+          } else {
+            debugPrint("Scan stopped manually, not restarting.");
+            notifyListeners();
+          }
+        },
+      );
+      debugPrint("Started scanning with isForScanAll: $isForScanAll");
+    } catch (e) {
+      debugPrint("❌ Failed to start scan: $e");
+      _isScanning = false;
+      notifyListeners();
+    }
   }
 
   void _processDiscoveredDevice(DiscoveredDevice device, DeviceTrackingService trackingService, bool isForScanAll) {
     try {
       if (!isForScanAll && !trackingService.getTrackedDevices().contains(device.id)) {
+        debugPrint("Filtered out device ${device.id} - not tracked");
         return; // Ignore untracked devices when scanning for tracking
       }
 
@@ -78,22 +94,21 @@ class BluetoothScanner extends ChangeNotifier {
       final double previousDistance = trackingService.distanceMap[deviceId] ?? -1.0;
       final int previousRssi = trackingService.rssiMap[deviceId] ?? -100;
 
-      if ((filteredRssi - previousRssi).abs() < 1.5 && (estimatedDistance - previousDistance).abs() < 0.5) {
+      if ((filteredRssi - previousRssi).abs() < 1.5 && (estimatedDistance - previousDistance).abs() < 0.2) {
         return; // No significant change, ignore
       }
 
       trackingService.rssiMap[deviceId] = filteredRssi.toInt();
       trackingService.distanceMap[deviceId] = estimatedDistance;
+      trackingService.lastSeenMap[deviceId] = DateTime.now();
 
       debugPrint("📡 Device $deviceId: RSSI=$rssi, Filtered RSSI=$filteredRssi, Distance=$estimatedDistance");
 
       // Update existing device or add new one
       final existingDeviceIndex = _devices.indexWhere((d) => d.id == deviceId);
       if (existingDeviceIndex >= 0) {
-        // Update existing device
         _devices[existingDeviceIndex] = device;
       } else {
-        // Add new device
         _devices.add(device);
       }
 
@@ -107,7 +122,8 @@ class BluetoothScanner extends ChangeNotifier {
   void _handleScanError(dynamic error) async {
     debugPrint("❌ Scan error: $error");
     _isScanning = false;
-    await Future.delayed(const Duration(seconds: 5));
+    notifyListeners();
+    await Future.delayed(const Duration(seconds: 1));
   }
 
   Future<bool> _checkAndRequestPermissions() async {
@@ -153,8 +169,8 @@ void stopScan() {
     _scanSubscription?.cancel();
     _scanSubscription = null;
     _isScanning = false;
-    flutterReactiveBle.deinitialize();
     notifyListeners();
+    debugPrint("Scan stopped.");
   }
 
    @override

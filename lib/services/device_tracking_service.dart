@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:track_tag/models/device_tracking_info.dart';
 import 'package:track_tag/services/bluetooth_service.dart';
@@ -18,6 +19,7 @@ enum TrackedDeviceState {
 }
 
 class DeviceTrackingService extends ChangeNotifier {
+  bool _isDisposed = false;
   final NotificationService notificationService;
   final GlobalKey<NavigatorState> navigatorKey;
   
@@ -28,6 +30,7 @@ class DeviceTrackingService extends ChangeNotifier {
   final Map<String, int> rssiMap = {};
   final Map<String, DateTime> lastSeenMap = {}; 
   final Set<String> _trackedDevices = {};
+  final Map<String, TrackedDeviceState> _lastKnownState = {};
 
   static const Duration rssiTimeout = Duration(seconds: 10);
   static const Duration checkInterval = Duration(seconds: 1);
@@ -38,7 +41,25 @@ class DeviceTrackingService extends ChangeNotifier {
   double userDefinedRange = 10.0; // Default range
   final Map<String, KalmanFilter> filters = {};
 
-  DeviceTrackingService(this.notificationService, this.navigatorKey);
+  DeviceTrackingService(this.notificationService, this.navigatorKey) {
+    Timer.periodic(checkInterval, (timer) {
+      _updateTrackingStates();
+    });
+    Timer.periodic(const Duration(minutes: 5), (timer) {
+      for (var deviceId in _trackedDevices) {
+        if (getConnectionState(deviceId) == TrackedDeviceState.connected) {
+          _saveDeviceStateToFirebase(deviceId);
+        }
+      }
+    });
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_isDisposed) {
+      super.notifyListeners();
+    }
+  }
 
   Future<void> loadTrackingPreferences(String userId) async {
     try {
@@ -62,25 +83,16 @@ class DeviceTrackingService extends ChangeNotifier {
   }
 
   KalmanFilter getKalmanFilter(String deviceId) {
-    filters.putIfAbsent(deviceId, () => KalmanFilter());
-    
-    // Cleanup old filters if last seen was long ago
-    if (lastSeenMap.containsKey(deviceId) &&
-        DateTime.now().difference(lastSeenMap[deviceId]!) > const Duration(minutes: 10)) {
-      filters.remove(deviceId);
-    }
-
-    return filters[deviceId]!;
+    return filters.putIfAbsent(deviceId, () => KalmanFilter());
   }
 
   DeviceTrackingInfo getDeviceTrackingInfo(String deviceId) {
     return _deviceTracking.putIfAbsent(deviceId, () => 
-      DeviceTrackingInfo(deviceId: deviceId, isTracking: false, lastSeen: DateTime.now()));
+      DeviceTrackingInfo(deviceId: deviceId, isTracking: false, lastSeen: DateTime.now()))
+      ..isTracking = _trackedDevices.contains(deviceId);
   }
 
-  bool isDeviceTracking(String deviceId) {
-    return _trackedDevices.contains(deviceId);
-  }
+  bool isDeviceTracking(String deviceId) => _trackedDevices.contains(deviceId);
 
   Set<String> getTrackedDevices() => _trackedDevices;
 
@@ -89,48 +101,77 @@ class DeviceTrackingService extends ChangeNotifier {
     debugPrint("🔍 DeviceTrackingInfo for $deviceId:");
     debugPrint("   isTracking: ${_deviceTracking[deviceId]?.isTracking}");
     debugPrint("   lastSeen: ${_deviceTracking[deviceId]?.lastSeen}");
+    debugPrint("   distance: ${distanceMap[deviceId]}");
+    debugPrint("   rssi: ${rssiMap[deviceId]}");
   }
 
   // called in device_status_page
-  Future<void> toggleTracking(String deviceId) async {
+  Future<void> toggleTracking(String deviceId, BluetoothService bluetoothService) async {
     debugDeviceTrackingState(deviceId);
     final prefs = await SharedPreferences.getInstance();
+    final trackingInfo = getDeviceTrackingInfo(deviceId);
 
     bool wasTracking = _trackedDevices.contains(deviceId);
 
     if (_trackedDevices.contains(deviceId)) {
       _trackedDevices.remove(deviceId);
+      trackingInfo.isTracking = false;
       await prefs.setBool('tracking_$deviceId', false);
+      if (wasTracking && _trackedDevices.isEmpty) {
+        bluetoothService.stopScan();
+      }
     } else {
       _trackedDevices.add(deviceId);
+      trackingInfo.isTracking = true;
       await prefs.setBool('tracking_$deviceId', true);
-    }
-    notifyListeners();
-    debugDeviceTrackingState(deviceId);
-
-    if (!wasTracking) {
-      final bluetoothService = Provider.of<BluetoothService>(navigatorKey.currentContext!, listen: false);
       bluetoothService.startScan(this, isForScanAll: false);
     }
+
+    notifyListeners();
+    debugDeviceTrackingState(deviceId);
   }
 
-TrackedDeviceState getConnectionState(String deviceId) {
-  final isTracked = isDeviceTracking(deviceId);
+  TrackedDeviceState getConnectionState(String deviceId) {
+    final isTracked = isDeviceTracking(deviceId);
 
-  if (!isTracked) {
-    return TrackedDeviceState.disconnected;
+    if (!isTracked) {
+      return TrackedDeviceState.disconnected;
+    }
+
+    final lastSeen = lastSeenMap[deviceId];
+    final rssi = getSmoothedRssi(deviceId);
+
+    if (lastSeen == null || DateTime.now().difference(lastSeen) > rssiTimeout) {
+      return TrackedDeviceState.disconnected;  
+    }
+
+    if (rssi == 0) {
+      return TrackedDeviceState.lost;
+    } else if (rssi > -100) {
+      return TrackedDeviceState.connected;
+    } else {
+      return TrackedDeviceState.disconnected;
+    }
   }
 
-  final rssi = getSmoothedRssi(deviceId);
+  void _updateTrackingStates() async {
+    for (var deviceId in _trackedDevices) {
+      final lastSeen = lastSeenMap[deviceId];
+      final currentState = getConnectionState(deviceId);
+      final previousState = _lastKnownState[deviceId] ?? TrackedDeviceState.disconnected;
 
-  if (rssi == 0) {
-    return TrackedDeviceState.lost; // No signal detected
-  } else if (rssi > -100) {
-    return TrackedDeviceState.connected; // Strong signal
-  } else {
-    return TrackedDeviceState.disconnected; // Weak or no connection
+      if (currentState != previousState) {
+        _lastKnownState[deviceId] = currentState;
+        if (currentState == TrackedDeviceState.disconnected || currentState == TrackedDeviceState.lost) {
+          await _saveDeviceStateToFirebase(deviceId);
+        }
+      }
+
+      if (lastSeen == null || DateTime.now().difference(lastSeen) > rssiTimeout) {
+        notifyListeners(); // Update UI for state change
+      }
+    }
   }
-}
 
 /// *****************Distance Calculation*****************///
   double getEstimatedDistance(String deviceId) {
@@ -166,8 +207,40 @@ TrackedDeviceState getConnectionState(String deviceId) {
     return rssiMap[deviceId] ?? -100;
   }
 
+/// *****************Firebase*****************///
+  Future<void> _saveDeviceStateToFirebase(String deviceId) async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) {
+        debugPrint("No user signed in, skipping Firebase save for $deviceId");
+        return;
+      }
+
+      final stateData = {
+        'deviceId': deviceId,
+        'status': getConnectionState(deviceId).toString().split('.').last,
+        'distance': distanceMap[deviceId] ?? -1.0,
+        'signalStrength': rssiMap[deviceId] ?? -100,
+        'lastSeen': lastSeenMap[deviceId]?.toIso8601String() ?? null,
+        'timestamp': FieldValue.serverTimestamp(),
+      };
+
+      await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('trackedDevices')
+        .doc(deviceId)
+        .set(stateData, SetOptions(merge: true));
+
+      debugPrint("Saved state to Firebase for $deviceId: $stateData");
+    } catch (e) {
+      debugPrint("Error saving device state to Firebase: $e");
+    }
+  }
+
   @override
   void dispose() {
+    _isDisposed = true;
     for (var timer in _activeSearchTimers.values) {
       timer.cancel();
     }
