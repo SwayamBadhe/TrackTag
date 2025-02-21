@@ -1,5 +1,6 @@
 // lib/pages/device_status_page.dart
 import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
@@ -28,6 +29,7 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
   late NotificationService notificationService;
   XFile? _profileImage;
   bool isTracking = false;
+  double _tempRange = 15.0;
 
   @override
   void initState() {
@@ -63,6 +65,19 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
     } catch (e) {
       debugPrint("Error toggling tracking: $e");
     }
+  }
+
+  Future<void> _updateRange(double value) async {
+    final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    setState(() {
+      _tempRange = value;
+    });
+    trackingService.userDefinedRange = value;
+    if (userId != null) {
+      await trackingService.saveTrackingPreferences(userId);
+    }
+    trackingService.notifyListeners();
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -126,30 +141,49 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: StreamBuilder<List<DiscoveredDevice>>(
-                    stream: bluetoothService.deviceStream,
-                    builder: (context, snapshot) {
-                      final connectionState = trackingService.getConnectionState(widget.deviceId);
-                      final distance = trackingService.getEstimatedDistance(widget.deviceId);
-                      final rssi = trackingService.getSmoothedRssi(widget.deviceId);
-                      final lastSeen = trackingService.lastSeenMap[widget.deviceId];
+                  child: Column(
+                    children: [
+                      StreamBuilder<List<DiscoveredDevice>>(
+                        stream: bluetoothService.deviceStream,
+                        builder: (context, snapshot) {
+                          final connectionState = trackingService.getConnectionState(widget.deviceId);
+                          final distance = trackingService.getEstimatedDistance(widget.deviceId);
+                          final rssi = trackingService.getSmoothedRssi(widget.deviceId);
+                          final lastSeen = trackingService.lastSeenMap[widget.deviceId];
 
-                      return Column(
-                        children: [
-                          _buildConnectionStatus(connectionState),
-                          const SizedBox(height: 16),
-                          _buildStatusRow('Distance', 
-                            distance >= 0 ? '${distance.toStringAsFixed(2)} m' : 'Unknown',
-                            _getDistanceColor(distance)),
-                          const SizedBox(height: 8),
-                          _buildStatusRow('Signal Strength', 
-                            '$rssi dBm',
-                            _getRssiColor(rssi)),
-                          const SizedBox(height: 16),
-                          _buildLastSeen(lastSeen),
-                        ],
-                      );
-                    },
+                          return Column(
+                            children: [
+                              _buildConnectionStatus(connectionState),
+                              const SizedBox(height: 16),
+                              _buildStatusRow('Distance', 
+                                distance >= 0 ? '${distance.toStringAsFixed(2)} m' : 'Unknown',
+                                _getDistanceColor(distance)),
+                              const SizedBox(height: 8),
+                              _buildStatusRow('Signal Strength', 
+                                '$rssi dBm',
+                                _getRssiColor(rssi)),
+                              const SizedBox(height: 16),
+                              _buildLastSeen(lastSeen),
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      Text('Lost Distance Threshold: ${_tempRange.toStringAsFixed(1)} m'),
+                      Slider(
+                        value: _tempRange,
+                        min: 5.0,
+                        max: 30.0,
+                        divisions: 25,
+                        label: '${_tempRange.toStringAsFixed(1)} m',
+                        onChanged: (value) {
+                          setState(() {
+                            _tempRange = value;
+                          });
+                        },
+                        onChangeEnd: (value) => _updateRange(value), // Save on release
+                      ),
+                    ],
                   ),
                 ),
               ),

@@ -32,13 +32,13 @@ class DeviceTrackingService extends ChangeNotifier {
   final Set<String> _trackedDevices = {};
   final Map<String, TrackedDeviceState> _lastKnownState = {};
 
-  static const Duration rssiTimeout = Duration(seconds: 10);
+  static const Duration rssiTimeout = Duration(seconds: 30);
   static const Duration checkInterval = Duration(seconds: 1);
   static const double LOST_THRESHOLD_METERS = 10.0;
   static const int ACTIVE_SEARCH_INTERVAL = 500;
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  double userDefinedRange = 10.0; // Default range
+  double userDefinedRange = 15.0; // Default range
   final Map<String, KalmanFilter> filters = {};
 
   DeviceTrackingService(this.notificationService, this.navigatorKey) {
@@ -65,8 +65,9 @@ class DeviceTrackingService extends ChangeNotifier {
     try {
       DocumentSnapshot doc = await _firestore.collection('users').doc(userId).get();
       if (doc.exists) {
-        userDefinedRange = doc['userDefinedRange'] ?? 5.0;
+        userDefinedRange = (doc['userDefinedRange'] as num?)?.toDouble() ?? 15.0;
       }
+      notifyListeners();
     } catch (e) {
       debugPrint("Error loading tracking preferences: $e");
     }
@@ -77,6 +78,7 @@ class DeviceTrackingService extends ChangeNotifier {
       await _firestore.collection('users').doc(userId).set({
         'userDefinedRange': userDefinedRange,
       }, SetOptions(merge: true));
+      debugPrint("Saved userDefinedRange: $userDefinedRange to Firebase");
     } catch (e) {
       debugPrint("Error saving tracking preferences: $e");
     }
@@ -103,6 +105,7 @@ class DeviceTrackingService extends ChangeNotifier {
     debugPrint("   lastSeen: ${_deviceTracking[deviceId]?.lastSeen}");
     debugPrint("   distance: ${distanceMap[deviceId]}");
     debugPrint("   rssi: ${rssiMap[deviceId]}");
+    debugPrint("   connectionState: ${getConnectionState(deviceId)}");
   }
 
   // called in device_status_page
@@ -114,6 +117,8 @@ class DeviceTrackingService extends ChangeNotifier {
     bool wasTracking = _trackedDevices.contains(deviceId);
 
     if (_trackedDevices.contains(deviceId)) {
+      await _saveDeviceStateToFirebase(deviceId);
+      
       _trackedDevices.remove(deviceId);
       trackingInfo.isTracking = false;
       await prefs.setBool('tracking_$deviceId', false);
@@ -140,18 +145,15 @@ class DeviceTrackingService extends ChangeNotifier {
 
     final lastSeen = lastSeenMap[deviceId];
     final rssi = getSmoothedRssi(deviceId);
+    final distance = getEstimatedDistance(deviceId);
 
-    if (lastSeen == null || DateTime.now().difference(lastSeen) > rssiTimeout) {
-      return TrackedDeviceState.disconnected;  
-    }
+    if (lastSeen == null || DateTime.now().difference(lastSeen) > rssiTimeout) return TrackedDeviceState.disconnected;  
 
-    if (rssi == 0) {
-      return TrackedDeviceState.lost;
-    } else if (rssi > -100) {
-      return TrackedDeviceState.connected;
-    } else {
-      return TrackedDeviceState.disconnected;
-    }
+    if (distance > userDefinedRange && distance >= 0 && rssi > -100) return TrackedDeviceState.lost;
+
+    if (rssi > -100) return TrackedDeviceState.connected;
+
+    return TrackedDeviceState.disconnected;
   }
 
   void _updateTrackingStates() async {
@@ -168,7 +170,7 @@ class DeviceTrackingService extends ChangeNotifier {
       }
 
       if (lastSeen == null || DateTime.now().difference(lastSeen) > rssiTimeout) {
-        notifyListeners(); // Update UI for state change
+        notifyListeners();
       }
     }
   }
