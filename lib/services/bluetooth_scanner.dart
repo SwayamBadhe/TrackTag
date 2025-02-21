@@ -48,9 +48,13 @@ class BluetoothScanner extends ChangeNotifier {
       (device) => _processDiscoveredDevice(device, trackingService),
       onError: _handleScanError,
       onDone: () async {
-        _isScanning = false;
-        await Future.delayed(const Duration(seconds: 5));
-        startScan(trackingService);
+        if (_isScanning) { 
+          await Future.delayed(const Duration(seconds: 5));
+          startScan(trackingService);
+        } else {
+          debugPrint("Scan stopped manually, not restarting.");
+          notifyListeners();
+        }
       },
     );
   }
@@ -139,12 +143,13 @@ class BluetoothScanner extends ChangeNotifier {
     }
   }
 
-  void stopScan() {
+void stopScan() {
     if (!_isScanning) return;
     _scanSubscription?.cancel();
     _scanSubscription = null;
     _isScanning = false;
     flutterReactiveBle.deinitialize();
+    notifyListeners();
   }
 
    @override

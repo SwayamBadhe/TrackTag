@@ -24,7 +24,24 @@ class ScanDevicePageState extends State<ScanDevicePage> {
   @override
   void initState() {
     super.initState();
-    _startScanning();
+    final bluetoothService = Provider.of<BluetoothService>(context, listen: false);
+    bluetoothService.addListener(_updateScanningState);
+  }
+
+  void _updateScanningState() {
+    final bluetoothService = Provider.of<BluetoothService>(context, listen: false);
+    if (mounted) {
+      setState(() {
+        _isScanning = bluetoothService.isScanning;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    final bluetoothService = Provider.of<BluetoothService>(context, listen: false);
+    bluetoothService.removeListener(_updateScanningState);
+    super.dispose();
   }
 
   Future<void> _startScanning() async {
@@ -73,7 +90,16 @@ class ScanDevicePageState extends State<ScanDevicePage> {
                 : const Text('Register Device'),
           ),
           ElevatedButton(
-            onPressed: _isScanning ? bluetoothService.stopScan : _startScanning,
+            onPressed: () {
+              if (_isScanning) {
+                bluetoothService.stopScan();
+                setState(() {
+                  _isScanning = false;
+                });
+              } else {
+                _startScanning();
+              }
+            },
             child: Text(_isScanning ? "Stop Scan" : "Start Scan"),
           ),
           Expanded(
