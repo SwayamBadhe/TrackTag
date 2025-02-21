@@ -7,7 +7,6 @@ import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:track_tag/services/bluetooth_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:track_tag/services/notification_service.dart';
 import 'package:track_tag/services/device_tracking_service.dart';
 
@@ -28,6 +27,7 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
   final ImagePicker _picker = ImagePicker();
   late NotificationService notificationService;
   XFile? _profileImage;
+  String? _imageUrl;
   bool isTracking = false;
   double _tempRange = 15.0;
 
@@ -55,6 +55,17 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
       isTracking = bluetoothService.getDeviceTrackingInfo(widget.deviceId).isTracking;
       _tempRange = trackingService.userDefinedRange;
     });
+  }
+
+  Future<void> _loadDeviceDetails() async {
+    final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
+    final details = await trackingService.loadDeviceDetails(widget.deviceId);
+    if (mounted) {
+      setState(() {
+        _descriptionController.text = details['description'] ?? '';
+        _imageUrl = details['imageUrl'];
+      });
+    }
   }
 
   Future<void> _toggleTracking() async {
@@ -89,18 +100,31 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
   Future<void> _toggleLostMode(bool value) async {
     final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
     await trackingService.toggleLostMode(widget.deviceId, value);
-    setState(() {}); // Refresh UI
+    setState(() {});
   }
 
   Future<void> _pickImage(ImageSource source) async {
     try {
       final pickedFile = await _picker.pickImage(source: source);
       if (pickedFile != null && mounted) {
-        setState(() => _profileImage = pickedFile);
+        setState(() {
+          _profileImage = pickedFile;
+        });
+        final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
+        await trackingService.saveDeviceDetails(widget.deviceId, imageFile: File(pickedFile.path));
+        setState(() {
+          _imageUrl = null; 
+          _loadDeviceDetails(); 
+        });
       }
     } catch (e) {
       debugPrint("Error picking image: $e");
     }
+  }
+
+  Future<void> _saveDescription() async {
+    final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
+    await trackingService.saveDeviceDetails(widget.deviceId, description: _descriptionController.text);
   }
 
   @override
@@ -122,8 +146,8 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
                   radius: 60,
                   backgroundImage: _profileImage != null 
                       ? FileImage(File(_profileImage!.path)) 
-                      : null,
-                  child: _profileImage == null 
+                      : (_imageUrl != null ? NetworkImage(_imageUrl!) : null),
+                  child: _profileImage == null && _imageUrl == null 
                       ? const Icon(Icons.camera_alt, size: 40) 
                       : null,
                 ),
@@ -138,6 +162,7 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
                 border: OutlineInputBorder(),
                 hintText: 'Write a description...'
               ),
+              onSubmitted: (_) => _saveDescription(),
             ),
             const SizedBox(height: 16),
             SwitchListTile(
@@ -189,7 +214,7 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
                               if (trackingService.isDeviceInLostMode(widget.deviceId)) ...[
                                 const SizedBox(height: 16),
                                 _buildStatusRow('Direction', direction, Colors.blue),
-                                const SizedBox(height: 16),                                
+                                const SizedBox(height: 16),
                               ],
                             ],
                           );

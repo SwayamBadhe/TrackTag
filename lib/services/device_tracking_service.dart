@@ -1,5 +1,6 @@
 // lib/services/device_tracking_service.dart
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
@@ -7,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:track_tag/models/device_tracking_info.dart';
 import 'package:track_tag/services/bluetooth_service.dart';
 import 'package:track_tag/services/notification_service.dart';
@@ -40,6 +42,7 @@ class DeviceTrackingService extends ChangeNotifier {
   static const int ACTIVE_SEARCH_INTERVAL = 500;
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
   double userDefinedRange = 15.0; // Default range
   final Map<String, KalmanFilter> filters = {};
 
@@ -68,16 +71,8 @@ class DeviceTrackingService extends ChangeNotifier {
       DocumentSnapshot doc = await _firestore.collection('users').doc(userId).get();
       if (doc.exists) {
         userDefinedRange = (doc['userDefinedRange'] as num?)?.toDouble() ?? 15.0;
-        final trackedDevicesSnapshot = await _firestore
-              .collection('users')
-              .doc(userId)
-              .collection('trackedDevices')
-              .get();
-          for (var doc in trackedDevicesSnapshot.docs) {
-            _lostModeMap[doc.id] = doc['lostMode'] ?? false;
-          }
-        }
-        notifyListeners();
+      }
+      notifyListeners();
     } catch (e) {
       debugPrint("Error loading tracking preferences: $e");
     }
@@ -91,6 +86,69 @@ class DeviceTrackingService extends ChangeNotifier {
       debugPrint("Saved userDefinedRange: $userDefinedRange to Firebase");
     } catch (e) {
       debugPrint("Error saving tracking preferences: $e");
+    }
+  }
+
+  Future<Map<String, dynamic>> loadDeviceDetails(String deviceId) async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return {'description': '', 'imageUrl': null};
+
+      final doc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('trackedDevices')
+          .doc(deviceId)
+          .get();
+
+      if (doc.exists) {
+        return {
+          'description': doc['description'] ?? '',
+          'imageUrl': doc['imageUrl'],
+          'lostMode': doc['lostMode'] ?? false,
+        };
+      }
+      return {'description': '', 'imageUrl': null};
+    } catch (e) {
+      debugPrint("Error loading device details: $e");
+      return {'description': '', 'imageUrl': null};
+    }
+  }
+
+  Future<void> saveDeviceDetails(String deviceId, {String? description, File? imageFile}) async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) {
+        debugPrint("No user signed in, skipping Firebase save for $deviceId");
+        return;
+      }
+
+      final data = <String, dynamic>{};
+      String? imageUrl;
+
+      // Upload image to Firebase Storage if provided
+      if (imageFile != null) {
+        final ref = _storage.ref().child('device_images/$userId/$deviceId');
+        await ref.putFile(imageFile);
+        imageUrl = await ref.getDownloadURL();
+        data['imageUrl'] = imageUrl;
+      }
+
+      if (description != null) {
+        data['description'] = description;
+      }
+
+      if (data.isNotEmpty) {
+        await _firestore
+            .collection('users')
+            .doc(userId)
+            .collection('trackedDevices')
+            .doc(deviceId)
+            .set(data, SetOptions(merge: true));
+        debugPrint("Saved device details for $deviceId: $data");
+      }
+    } catch (e) {
+      debugPrint("Error saving device details to Firebase: $e");
     }
   }
 
