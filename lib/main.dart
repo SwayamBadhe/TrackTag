@@ -109,7 +109,7 @@ class MyApp extends StatelessWidget {
         ),
         routes: {
           '/login': (context) => const LoginPage(),
-          '/homepage': (context) => const HomePage(devices: []),
+          '/homepage': (context) => const HomePage(devices: [],),
           '/menu': (context) => const MenuPage(
                 userEmail: 'user@example.com',
                 profilePhotoUrl: 'https://example.com/profile.jpg',

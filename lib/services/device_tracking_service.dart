@@ -42,11 +42,11 @@ class DeviceTrackingService extends ChangeNotifier {
   static const int ACTIVE_SEARCH_INTERVAL = 500;
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
   double userDefinedRange = 15.0; // Default range
   final Map<String, KalmanFilter> filters = {};
 
   DeviceTrackingService(this.notificationService, this.navigatorKey) {
+    _loadTrackedDevices();
     Timer.periodic(checkInterval, (timer) {
       _updateTrackingStates();
     });
@@ -64,6 +64,24 @@ class DeviceTrackingService extends ChangeNotifier {
     if (!_isDisposed) {
       super.notifyListeners();
     }
+  }
+
+  Future<void> _loadTrackedDevices() async {
+    final prefs = await SharedPreferences.getInstance();
+    final deviceIds = prefs.getStringList('device_ids') ?? [];
+    for (var deviceId in deviceIds) {
+      final isTracking = prefs.getBool('tracking_$deviceId') ?? false;
+      if (isTracking && !_trackedDevices.contains(deviceId)) {
+        _trackedDevices.add(deviceId);
+        _deviceTracking[deviceId] = DeviceTrackingInfo(
+          deviceId: deviceId,
+          isTracking: true,
+          lastSeen: DateTime.now(),
+        );
+      }
+    }
+    debugPrint("Loaded tracked devices: $_trackedDevices");
+    notifyListeners();
   }
 
   Future<void> loadTrackingPreferences(String userId) async {
@@ -118,9 +136,9 @@ class DeviceTrackingService extends ChangeNotifier {
 
   // called in device_status_page
   Future<void> toggleTracking(String deviceId, BluetoothService bluetoothService) async {
-    debugDeviceTrackingState(deviceId);
     final prefs = await SharedPreferences.getInstance();
     final trackingInfo = getDeviceTrackingInfo(deviceId);
+    final userId = FirebaseAuth.instance.currentUser?.uid;
 
     bool wasTracking = _trackedDevices.contains(deviceId);
 
@@ -136,11 +154,17 @@ class DeviceTrackingService extends ChangeNotifier {
       _trackedDevices.add(deviceId);
       trackingInfo.isTracking = true;
       await prefs.setBool('tracking_$deviceId', true);
+      if (userId != null) {
+        await FirebaseFirestore.instance.collection('devices').doc(deviceId).set({
+          'deviceId': deviceId,
+          'userId': userId,
+        }, SetOptions(merge: true));
+      }
       bluetoothService.startScan(this, isForScanAll: false);
     }
 
+    debugPrint("Toggled tracking for $deviceId. Tracked devices: $_trackedDevices");
     notifyListeners();
-    debugDeviceTrackingState(deviceId);
   }
 
   Future<void> toggleLostMode(String deviceId, bool enableLostMode) async {
@@ -282,6 +306,103 @@ class DeviceTrackingService extends ChangeNotifier {
       debugPrint("Saved state to Firebase for $deviceId: $stateData");
     } catch (e) {
       debugPrint("Error saving device state to Firebase: $e");
+    }
+  }
+
+  Future<String> getDeviceNameFromDevices(String deviceId) async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return deviceId;
+      final doc = await _firestore
+          .collection('devices')
+          .doc(deviceId)
+          .get();
+      return doc.exists && doc['deviceName'] != null ? doc['deviceName'] as String : deviceId;
+    } catch (e) {
+      debugPrint("Error getting device name from devices: $e");
+      return deviceId; // Fallback to ID on error
+    }
+  }
+
+  Future<String> getDeviceName(String deviceId) async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) return deviceId;
+      final doc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('trackedDevices')
+          .doc(deviceId)
+          .get();
+      return doc.exists && doc['name'] != null ? doc['name'] as String : deviceId;
+    } catch (e) {
+      debugPrint("Error getting device name: $e");
+      return deviceId;
+    }
+  }
+
+  Future<void> renameDevice(String deviceId, String newName) async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) {
+        debugPrint("No user signed in, cannot rename device");
+        return;
+      }
+      
+      await _firestore
+          .collection('devices')
+          .doc(deviceId)
+          .set({'deviceName': newName}, SetOptions(merge: true));
+      debugPrint("Renamed device $deviceId to $newName in devices collection");
+      
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('trackedDevices')
+          .doc(deviceId)
+          .set({'name': newName}, SetOptions(merge: true));
+      debugPrint("Synced name to trackedDevices: $newName");
+      notifyListeners();
+    } catch (e) {
+      debugPrint("Error renaming device: $e");
+    }
+  }
+  
+  Future<void> deleteDevice(String deviceId) async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) {
+        debugPrint("No user signed in, cannot delete device");
+        return;
+      }
+
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('trackedDevices')
+          .doc(deviceId)
+          .delete();
+      debugPrint("Deleted $deviceId from trackedDevices");
+
+      await _firestore
+          .collection('devices')
+          .doc(deviceId)
+          .delete();
+      debugPrint("Deleted $deviceId from devices");
+
+      // Update local state
+      _trackedDevices.remove(deviceId);
+      _deviceTracking.remove(deviceId);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('tracking_$deviceId', false);
+      List<String> deviceIds = prefs.getStringList('device_ids') ?? [];
+      deviceIds.remove(deviceId);
+      await prefs.setStringList('device_ids', deviceIds);
+      
+      notifyListeners();
+    } catch (e) {
+      debugPrint("Error deleting device: $e");
+      rethrow; 
     }
   }
 

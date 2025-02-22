@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:track_tag/screens/home_page.dart';  // Import your HomePage here
+import 'package:track_tag/screens/home_page.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -22,11 +22,10 @@ class AuthScreenState extends State<AuthScreen> {
         email: _emailController.text,
         password: _passwordController.text,
       );
-      // On successful login, navigate to the HomePage
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => const HomePage(devices: []), // Pass empty list for now
+          builder: (context) => const HomePage(devices: [],), 
         ),
       );
     } catch (e) {

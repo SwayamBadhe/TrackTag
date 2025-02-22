@@ -3,9 +3,11 @@ import 'package:track_tag/screens/menu_page.dart';
 import 'package:track_tag/screens/scan_device_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:track_tag/screens/device_status_page.dart';
+import 'package:provider/provider.dart';
+import 'package:track_tag/services/device_tracking_service.dart';
 
 class HomePage extends StatefulWidget {
-  final List<String> devices;
+  final List<String> devices; 
 
   const HomePage({super.key, required this.devices});
 
@@ -26,7 +28,7 @@ class _HomePageState extends State<HomePage> {
     final newDevice = await Navigator.of(context).push<String>(
       MaterialPageRoute(builder: (context) => const ScanDevicePage()),
     );
-    if (newDevice != null) {
+    if (newDevice != null && !_connectedDevices.contains(newDevice)) {
       setState(() {
         _connectedDevices.add(newDevice);
       });
@@ -35,10 +37,12 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Get the current user from Firebase Authentication
+    final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
     final user = FirebaseAuth.instance.currentUser;
-    String? userEmail = user?.email ?? 'No email'; // Default fallback
-    String? profilePhotoUrl = user?.photoURL ?? ''; // Default fallback
+    String? userEmail = user?.email ?? 'No email';
+    String? profilePhotoUrl = user?.photoURL ?? '';
+
+    debugPrint("HomePage devices: $_connectedDevices");
 
     return Scaffold(
       appBar: AppBar(
@@ -52,8 +56,8 @@ class _HomePageState extends State<HomePage> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => MenuPage(
-                    userEmail: userEmail, // Pass actual user email
-                    profilePhotoUrl: profilePhotoUrl, // Pass actual profile photo URL
+                    userEmail: userEmail,
+                    profilePhotoUrl: profilePhotoUrl,
                   ),
                 ),
               );
@@ -99,39 +103,43 @@ class _HomePageState extends State<HomePage> {
                     ),
                   );
                 } else {
-                  // Connected Device Card
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => DeviceStatusPage(
-                              deviceId: _connectedDevices[index]),
+                  final deviceId = _connectedDevices[index];
+                  return FutureBuilder<String>(
+                    future: trackingService.getDeviceNameFromDevices(deviceId),
+                    builder: (context, snapshot) {
+                      final deviceName = snapshot.data ?? deviceId;
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => DeviceStatusPage(deviceId: deviceId),
+                            ),
+                          );
+                        },
+                        child: Card(
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.device_hub, size: 40, color: Colors.blue),
+                              const SizedBox(height: 8),
+                              Text(
+                                deviceName,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     },
-                    child: Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.device_hub,
-                              size: 40, color: Colors.blue),
-                          const SizedBox(height: 8),
-                          Text(
-                            _connectedDevices[index],
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   );
                 }
               },

@@ -35,7 +35,7 @@ class LoginPageState extends State<LoginPage> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => const HomePage(devices: []), // Placeholder for devices
+          builder: (context) => const HomePage(devices: [],), 
         ),
       );
     } else {

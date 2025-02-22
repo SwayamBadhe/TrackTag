@@ -22,6 +22,7 @@ class DeviceStatusPage extends StatefulWidget {
 }
 
 class DeviceStatusPageState extends State<DeviceStatusPage> {
+  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
   late NotificationService notificationService;
@@ -35,25 +36,33 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
     super.initState();
     notificationService = NotificationService();
     _loadTrackingState();
+    _loadDeviceName();
   }
 
   @override
   void dispose() {
     _descriptionController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
   Future<void> _loadTrackingState() async {
     final bluetoothService = Provider.of<BluetoothService>(context, listen: false);
     final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId != null) {
-      await trackingService.loadTrackingPreferences(userId);
-    }
     if (mounted) {
       setState(() {
         isTracking = bluetoothService.getDeviceTrackingInfo(widget.deviceId).isTracking;
         _tempRange = trackingService.userDefinedRange;
+      });
+    }
+  }
+
+  Future<void> _loadDeviceName() async {
+    final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
+    final name = await trackingService.getDeviceNameFromDevices(widget.deviceId);
+    if (mounted) {
+      setState(() {
+        _nameController.text = name;
       });
     }
   }
@@ -97,6 +106,32 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
     }
   }
 
+  Future<void> _renameDevice() async {
+    final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
+    final newName = _nameController.text.trim();
+    if (newName.isNotEmpty) {
+      await trackingService.renameDevice(widget.deviceId, newName);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Device renamed')),
+        );
+      }
+    } else {
+      debugPrint("New name is empty, skipping rename");
+    }
+  }
+
+  Future<void> _deleteDevice() async {
+    final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
+    await trackingService.deleteDevice(widget.deviceId);
+    if (mounted) {
+      Navigator.pop(context); // Go back to HomePage
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Device deleted')),
+      );
+    }
+  }
+
   Future<void> _pickImage(ImageSource source) async {
     try {
       final pickedFile = await _picker.pickImage(source: source);
@@ -121,34 +156,67 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
     final trackingService = Provider.of<DeviceTrackingService>(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Device Status')),
+      appBar: AppBar(
+        title: const Text('Device Status'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Delete Device'),
+                  content: const Text('Are you sure you want to delete this device?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        await _deleteDevice();
+                        Navigator.pop(context); // Close dialog
+                      },
+                      child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
-              child: GestureDetector(
-                onTap: () => _showImagePickerDialog(),
-                child: CircleAvatar(
-                  radius: 60,
-                  backgroundImage: _profileImage != null 
-                      ? FileImage(File(_profileImage!.path)) 
-                      : (_imageUrl != null ? NetworkImage(_imageUrl!) : null),
-                  child: _profileImage == null && _imageUrl == null 
-                      ? const Icon(Icons.camera_alt, size: 40) 
-                      : null,
+              child: CircleAvatar(
+                radius: 60,
+                child: const Icon(Icons.camera_alt, size: 40),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text('Device Name:', style: TextStyle(fontSize: 16)),
+            TextField(
+              controller: _nameController,
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                hintText: 'Enter device name',
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.save),
+                  onPressed: _renameDevice,
                 ),
               ),
             ),
             const SizedBox(height: 16),
             const Text('Description:', style: TextStyle(fontSize: 16)),
-            TextField(
-              controller: _descriptionController,
+            const TextField(
               maxLines: 3,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 border: OutlineInputBorder(),
-                hintText: 'Write a description...'
+                hintText: 'Write a description... (not saved)',
               ),
             ),
             const SizedBox(height: 16),

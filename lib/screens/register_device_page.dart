@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:track_tag/services/device_service.dart';
+import 'package:track_tag/services/bluetooth_service.dart'; 
 import 'package:track_tag/screens/home_page.dart';
+import 'package:provider/provider.dart';
+import 'package:track_tag/services/device_tracking_service.dart';
 
 class RegisterDevicePage extends StatefulWidget {
-  final String deviceId; // Device ID to register
+  final String deviceId;
 
   const RegisterDevicePage({super.key, required this.deviceId});
 
@@ -24,29 +26,31 @@ class RegisterDevicePageState extends State<RegisterDevicePage> {
     });
 
     try {
-      final deviceService = DeviceService();
-      await deviceService.registerDevice(widget.deviceId, _deviceNameController.text);
+      final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
+      final bluetoothService = Provider.of<BluetoothService>(context, listen: false);
 
-      // Save the device locally
+      if (!trackingService.getTrackedDevices().contains(widget.deviceId)) {
+        await trackingService.toggleTracking(widget.deviceId, bluetoothService);
+      }
+      await trackingService.renameDevice(widget.deviceId, _deviceNameController.text);
+
       final prefs = await SharedPreferences.getInstance();
       List<String> deviceIds = prefs.getStringList('device_ids') ?? [];
-
       if (!deviceIds.contains(widget.deviceId)) {
         deviceIds.add(widget.deviceId);
         await prefs.setStringList('device_ids', deviceIds);
       }
 
-      // Navigate to HomePage with updated device list
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
           builder: (context) => HomePage(devices: deviceIds),
         ),
-        (route) => false, // Removes all previous routes from the stack
+        (route) => false,
       );
     } catch (e) {
       setState(() {
-        _errorMessage = "Error: ${e.toString()}"; // Show specific error message
+        _errorMessage = "Error: ${e.toString()}";
       });
     } finally {
       setState(() {

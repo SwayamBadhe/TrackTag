@@ -6,11 +6,13 @@ import 'package:track_tag/screens/home_page.dart';
 
 Future<void> fetchUserDevicesAndNavigate(BuildContext context, User user) async {
   try {
-    QuerySnapshot snapshot = await FirebaseFirestore.instance.collection('devices')
-      .where('userId', isEqualTo: user.uid)
-      .get();
+    QuerySnapshot snapshot = await FirebaseFirestore.instance
+        .collection('devices')
+        .where('userId', isEqualTo: user.uid)
+        .get();
 
     List<String> userDevices = snapshot.docs.map((doc) => doc['deviceId'] as String).toList();
+    debugPrint("Fetched devices: $userDevices");
 
     Navigator.push(
       context,
