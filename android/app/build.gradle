@@ -2,56 +2,47 @@ plugins {
     id "com.android.application"
     id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
-    id 'com.google.gms.google-services' 
+    id "com.google.gms.google-services" // Apply only here
 }
 
 android {
-    namespace = "com.example.track_tag"
-    compileSdk = 35 
-    ndkVersion = flutter.ndkVersion
+    namespace "com.example.track_tag"
+    compileSdk 35
+    ndkVersion flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_1_8
+        jvmTarget = "11"
     }
 
     defaultConfig {
-        applicationId = "com.example.track_tag"
-        minSdkVersion 23 // Firebase Auth requires at least SDK version 23
-        targetSdkVersion 35 // Set this to 35 or higher as per the latest plugins
-        versionCode flutter.versionCode
+        applicationId "com.example.track_tag"
+        minSdkVersion 23
+        targetSdkVersion 35
+        versionCode flutter.versionCode.toInteger()
         versionName flutter.versionName
         multiDexEnabled true
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.debug
+            signingConfig signingConfigs.debug
         }
     }
 }
 
-// Flutter configuration
 flutter {
-    source = "../.."
+    source "../.."
 }
 
 dependencies {
-    // Import the Firebase BoM
-    implementation(platform("com.google.firebase:firebase-bom:32.7.1"))
-
-    // When using the BoM, you don't specify versions in Firebase library dependencies
-
-    // Add the dependency for the Firebase SDK for Google Analytics
-    implementation("com.google.firebase:firebase-analytics")
-
-    // TODO: Add the dependencies for any other Firebase products you want to use
-    // See https://firebase.google.com/docs/android/setup#available-libraries
-    // For example, add the dependencies for Firebase Authentication and Cloud Firestore
-    implementation("com.google.firebase:firebase-auth")
-    implementation("com.google.firebase:firebase-firestore")
+    implementation platform('com.google.firebase:firebase-bom:33.1.2') // Updated to latest BoM
+    implementation 'com.google.firebase:firebase-analytics'
+    implementation 'com.google.firebase:firebase-auth'
+    implementation 'com.google.firebase:firebase-firestore'
+    implementation 'com.google.firebase:firebase-storage' // Added explicitly
 }
