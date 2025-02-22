@@ -2,16 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:track_tag/screens/device_status_page.dart';
 import 'package:track_tag/screens/auth/login_page.dart';
 import 'package:track_tag/utils/firestore_helper.dart';
-import 'services/bluetooth_service.dart';
-import 'services/device_tracking_service.dart';
-import 'services/background_service.dart';
+import 'package:track_tag/services/bluetooth_service.dart';
+import 'package:track_tag/services/device_tracking_service.dart';
+import 'package:track_tag/services/background_service.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:track_tag/screens/home_page.dart';
 import 'package:track_tag/screens/menu_page.dart';
-import 'firebase_options.dart';
-import 'services/notification_service.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:track_tag/firebase_options.dart';
+import 'package:track_tag/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,19 +21,19 @@ void main() async {
   );
 
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-  
   final notificationService = NotificationService();
   final deviceTrackingService = DeviceTrackingService(notificationService, navigatorKey);
   final bluetoothService = BluetoothService(navigatorKey);
 
-  // Start background service with proper dependencies
   await initializeBackgroundService(notificationService, bluetoothService, deviceTrackingService, navigatorKey);
 
-  runApp(const MyAppState());
+  runApp(MyAppState(navigatorKey: navigatorKey));
 }
 
 class MyAppState extends StatefulWidget {
-  const MyAppState({super.key});
+  final GlobalKey<NavigatorState> navigatorKey;
+
+  const MyAppState({super.key, required this.navigatorKey});
 
   @override
   State<MyAppState> createState() => _MyAppState();
@@ -46,22 +47,22 @@ class _MyAppState extends State<MyAppState> with WidgetsBindingObserver {
   }
 
   @override
-  void dispose() async {
+  void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    await stopBackgroundService(); // Ensure background service stops properly
+    stopBackgroundService();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.detached) {
-      stopBackgroundService(); // Ensure service stops when app is closed
+      stopBackgroundService();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return MyApp(navigatorKey: GlobalKey<NavigatorState>());
+    return MyApp(navigatorKey: widget.navigatorKey);
   }
 }
 
@@ -75,11 +76,11 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => BluetoothService(navigatorKey)),
-        Provider(create: (_) => NotificationService()), 
+        Provider(create: (_) => NotificationService()),
         ChangeNotifierProvider(
           create: (context) => DeviceTrackingService(
-            Provider.of<NotificationService>(context, listen: false), 
-            navigatorKey, 
+            Provider.of<NotificationService>(context, listen: false),
+            navigatorKey,
           ),
         ),
       ],
@@ -97,7 +98,9 @@ class MyApp extends StatelessWidget {
 
             if (snapshot.hasData) {
               final user = snapshot.data!;
-              fetchUserDevicesAndNavigate(context, user);
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                fetchUserDevicesAndNavigate(context, user);
+              });
               return const Center(child: CircularProgressIndicator());
             } else {
               return const LoginPage();

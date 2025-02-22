@@ -1,4 +1,3 @@
-// lib/pages/device_status_page.dart
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
@@ -51,19 +50,10 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
     if (userId != null) {
       await trackingService.loadTrackingPreferences(userId);
     }
-    setState(() {
-      isTracking = bluetoothService.getDeviceTrackingInfo(widget.deviceId).isTracking;
-      _tempRange = trackingService.userDefinedRange;
-    });
-  }
-
-  Future<void> _loadDeviceDetails() async {
-    final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
-    final details = await trackingService.loadDeviceDetails(widget.deviceId);
     if (mounted) {
       setState(() {
-        _descriptionController.text = details['description'] ?? '';
-        _imageUrl = details['imageUrl'];
+        isTracking = bluetoothService.getDeviceTrackingInfo(widget.deviceId).isTracking;
+        _tempRange = trackingService.userDefinedRange;
       });
     }
   }
@@ -87,20 +77,24 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
   Future<void> _updateRange(double value) async {
     final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
     final userId = FirebaseAuth.instance.currentUser?.uid;
-    setState(() {
-      _tempRange = value;
-    });
-    trackingService.userDefinedRange = value;
-    if (userId != null) {
-      await trackingService.saveTrackingPreferences(userId);
+    if (mounted) {
+      setState(() {
+        _tempRange = value;
+      });
+      trackingService.userDefinedRange = value;
+      if (userId != null) {
+        await trackingService.saveTrackingPreferences(userId);
+      }
+      trackingService.notifyListeners();
     }
-    trackingService.notifyListeners();
   }
 
   Future<void> _toggleLostMode(bool value) async {
     final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
     await trackingService.toggleLostMode(widget.deviceId, value);
-    setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -110,21 +104,15 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
         setState(() {
           _profileImage = pickedFile;
         });
-        final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
-        await trackingService.saveDeviceDetails(widget.deviceId, imageFile: File(pickedFile.path));
-        setState(() {
-          _imageUrl = null; 
-          _loadDeviceDetails(); 
-        });
       }
     } catch (e) {
-      debugPrint("Error picking image: $e");
+      debugPrint("Error picking/uploading image: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to upload image: $e')),
+        );
+      }
     }
-  }
-
-  Future<void> _saveDescription() async {
-    final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
-    await trackingService.saveDeviceDetails(widget.deviceId, description: _descriptionController.text);
   }
 
   @override
@@ -162,7 +150,6 @@ class DeviceStatusPageState extends State<DeviceStatusPage> {
                 border: OutlineInputBorder(),
                 hintText: 'Write a description...'
               ),
-              onSubmitted: (_) => _saveDescription(),
             ),
             const SizedBox(height: 16),
             SwitchListTile(

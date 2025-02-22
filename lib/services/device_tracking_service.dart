@@ -89,69 +89,6 @@ class DeviceTrackingService extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> loadDeviceDetails(String deviceId) async {
-    try {
-      final userId = FirebaseAuth.instance.currentUser?.uid;
-      if (userId == null) return {'description': '', 'imageUrl': null};
-
-      final doc = await _firestore
-          .collection('users')
-          .doc(userId)
-          .collection('trackedDevices')
-          .doc(deviceId)
-          .get();
-
-      if (doc.exists) {
-        return {
-          'description': doc['description'] ?? '',
-          'imageUrl': doc['imageUrl'],
-          'lostMode': doc['lostMode'] ?? false,
-        };
-      }
-      return {'description': '', 'imageUrl': null};
-    } catch (e) {
-      debugPrint("Error loading device details: $e");
-      return {'description': '', 'imageUrl': null};
-    }
-  }
-
-  Future<void> saveDeviceDetails(String deviceId, {String? description, File? imageFile}) async {
-    try {
-      final userId = FirebaseAuth.instance.currentUser?.uid;
-      if (userId == null) {
-        debugPrint("No user signed in, skipping Firebase save for $deviceId");
-        return;
-      }
-
-      final data = <String, dynamic>{};
-      String? imageUrl;
-
-      // Upload image to Firebase Storage if provided
-      if (imageFile != null) {
-        final ref = _storage.ref().child('device_images/$userId/$deviceId');
-        await ref.putFile(imageFile);
-        imageUrl = await ref.getDownloadURL();
-        data['imageUrl'] = imageUrl;
-      }
-
-      if (description != null) {
-        data['description'] = description;
-      }
-
-      if (data.isNotEmpty) {
-        await _firestore
-            .collection('users')
-            .doc(userId)
-            .collection('trackedDevices')
-            .doc(deviceId)
-            .set(data, SetOptions(merge: true));
-        debugPrint("Saved device details for $deviceId: $data");
-      }
-    } catch (e) {
-      debugPrint("Error saving device details to Firebase: $e");
-    }
-  }
-
   KalmanFilter getKalmanFilter(String deviceId) {
     return filters.putIfAbsent(deviceId, () => KalmanFilter());
   }
