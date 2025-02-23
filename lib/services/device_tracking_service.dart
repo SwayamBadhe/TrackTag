@@ -228,6 +228,31 @@ class DeviceTrackingService extends ChangeNotifier {
 
       if (currentState != previousState) {
         _lastKnownState[deviceId] = currentState;
+        String deviceName = await getDeviceNameFromDevices(deviceId);
+
+        if (isDeviceTracking(deviceId)) { // Only in tracking mode
+          if (currentState == TrackedDeviceState.lost && previousState != TrackedDeviceState.lost) {
+            await notificationService.showStatusAlert(
+              title: 'Device Lost',
+              body: '$deviceName is out of range',
+              payload: deviceId,
+              id: deviceId.hashCode,
+            );
+            debugPrint("Lost alert triggered for $deviceId");
+          } else if (currentState == TrackedDeviceState.disconnected && previousState != TrackedDeviceState.disconnected) {
+            await notificationService.showStatusAlert(
+              title: 'Device Disconnected',
+              body: '$deviceName has disconnected',
+              payload: deviceId,
+              id: deviceId.hashCode,
+            );
+            debugPrint("Disconnected alert triggered for $deviceId");
+          } else if (currentState == TrackedDeviceState.connected && previousState != TrackedDeviceState.connected) {
+            await notificationService.cancelNotification(deviceId.hashCode);
+            debugPrint("Cancelled alert for $deviceId on reconnect");
+          }
+        }
+
         if (currentState == TrackedDeviceState.disconnected || currentState == TrackedDeviceState.lost) {
           await _saveDeviceStateToFirebase(deviceId);
         }

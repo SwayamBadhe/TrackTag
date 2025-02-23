@@ -41,6 +41,25 @@ class BluetoothService extends ChangeNotifier {
     return _deviceTrackingService.getDeviceTrackingInfo(deviceId);
   }
 
+  Future<void> playSound(String deviceId) async {
+    try {
+      debugPrint("Sending sound command to $deviceId");
+      const soundServiceUuid = "0000180f-0000-1000-8000-00805f9b34fb"; 
+      const soundCharacteristicUuid = "00002a19-0000-1000-8000-00805f9b34fb"; 
+      await flutterReactiveBle.writeCharacteristicWithResponse(
+        QualifiedCharacteristic(
+          characteristicId: Uuid.parse(soundCharacteristicUuid),
+          serviceId: Uuid.parse(soundServiceUuid),
+          deviceId: deviceId,
+        ),
+        value: [0x01], 
+      );
+      debugPrint("Sound command sent successfully to $deviceId");
+    } catch (e) {
+      debugPrint("Error sending sound command: $e");
+      throw e; 
+    }
+  }
 
   Future<void> toggleTracking(String deviceId) async {
     try {

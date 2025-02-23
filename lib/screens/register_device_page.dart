@@ -4,6 +4,7 @@ import 'package:track_tag/services/bluetooth_service.dart';
 import 'package:track_tag/screens/home_page.dart';
 import 'package:provider/provider.dart';
 import 'package:track_tag/services/device_tracking_service.dart';
+import 'package:track_tag/services/notification_service.dart';
 
 class RegisterDevicePage extends StatefulWidget {
   final String deviceId;
@@ -24,7 +25,6 @@ class RegisterDevicePageState extends State<RegisterDevicePage> {
       _isRegistering = true;
       _errorMessage = null;
     });
-
     try {
       final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
       final bluetoothService = Provider.of<BluetoothService>(context, listen: false);
@@ -41,17 +41,28 @@ class RegisterDevicePageState extends State<RegisterDevicePage> {
         await prefs.setStringList('device_ids', deviceIds);
       }
 
+      await Provider.of<NotificationService>(context, listen: false).showSimpleNotification(
+        title: 'Device Registered',
+        body: '${_deviceNameController.text} has been added',
+        payload: widget.deviceId,
+        id: widget.deviceId.hashCode,
+      );
+
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(
-          builder: (context) => HomePage(devices: deviceIds),
-        ),
+        MaterialPageRoute(builder: (context) => HomePage(devices: deviceIds)),
         (route) => false,
       );
     } catch (e) {
       setState(() {
         _errorMessage = "Error: ${e.toString()}";
       });
+      await Provider.of<NotificationService>(context, listen: false).showSimpleNotification(
+        title: 'Registration Failed',
+        body: 'Error: ${e.toString()}',
+        payload: widget.deviceId,
+        id: widget.deviceId.hashCode,
+      );
     } finally {
       setState(() {
         _isRegistering = false;
