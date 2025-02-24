@@ -49,6 +49,7 @@ dependencies:
   flutter_background_service: ^5.1.0
   firebase_storage: ^12.3.2  
   firebase_app_check: ^0.3.2+3
+  flutter_background_service_android: ^6.3.0
 
 dev_dependencies:
   flutter_test:

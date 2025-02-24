@@ -9,34 +9,37 @@ import 'package:track_tag/services/notification_service.dart';
 
 GlobalKey<NavigatorState>? _navigatorKey;
 
-Future<void> initializeBackgroundService(NotificationService notificationService, 
-                                         BluetoothService bluetoothService, 
-                                         DeviceTrackingService trackingService,
-                                         GlobalKey<NavigatorState> navigatorKey) async {
-                                        
-  _navigatorKey = navigatorKey;
+Future<void> initializeBackgroundService(
+    NotificationService notificationService,
+    BluetoothService bluetoothService,
+    DeviceTrackingService deviceTrackingService,
+    GlobalKey<NavigatorState> navigatorKey,
+) async {
   final service = FlutterBackgroundService();
+  _navigatorKey = navigatorKey;
 
   await service.configure(
     androidConfiguration: AndroidConfiguration(
       onStart: onStart,
+      autoStart: false,
       isForegroundMode: true,
-      autoStart: true,
-      foregroundServiceNotificationId: 888,
+      foregroundServiceTypes: const [AndroidForegroundType.connectedDevice],
+      notificationChannelId: "ble_tracker_channel",
+      initialNotificationTitle: "TrackTag",
+      initialNotificationContent: "Initializing background service",
     ),
     iosConfiguration: IosConfiguration(
-      onBackground: onIosBackground,
+      autoStart: false,
       onForeground: onStart,
+      onBackground: onIosBackground,
     ),
   );
-
-  service.startService();
 }
 
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
   final notificationService = NotificationService();
-  
+
   if (_navigatorKey == null) {
     debugPrint("NavigatorKey is null in background service.");
     return;
@@ -81,4 +84,3 @@ Future<void> stopBackgroundService() async {
     service.invoke("stopService");
   }
 }
-

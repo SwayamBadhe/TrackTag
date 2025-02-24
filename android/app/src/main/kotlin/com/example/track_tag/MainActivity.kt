@@ -24,18 +24,22 @@ class MainActivity : FlutterActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        checkAndRequestPermissions { 
+            
+        }
+    }
 
-        // Start Foreground Service for BLE scanning
+    private fun startForegroundService() {
         val serviceIntent = Intent(this, MyForegroundService::class.java)
-        startService(serviceIntent)
-
-        // Check and request permissions on app start
-        checkAndRequestPermissions()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent)
+        } else {
+            startService(serviceIntent)
+        }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "requestEnableBluetooth" -> checkAndRequestPermissions(result)
@@ -45,44 +49,35 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    /**
-     * Request necessary permissions before enabling Bluetooth or BLE scanning.
-     */
-    private fun checkAndRequestPermissions(result: MethodChannel.Result? = null) {
+    private fun checkAndRequestPermissions(result: MethodChannel.Result? = null, callback: (() -> Unit)? = null) {
         val permissionsToRequest = mutableListOf<String>()
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // Android 12+ requires BLUETOOTH_SCAN and BLUETOOTH_CONNECT permissions
             if (!isPermissionGranted(Manifest.permission.BLUETOOTH_SCAN)) {
                 permissionsToRequest.add(Manifest.permission.BLUETOOTH_SCAN)
             }
             if (!isPermissionGranted(Manifest.permission.BLUETOOTH_CONNECT)) {
                 permissionsToRequest.add(Manifest.permission.BLUETOOTH_CONNECT)
             }
-        } else {
-            // Android 11 and below require location permissions for BLE scanning
-            if (!isPermissionGranted(Manifest.permission.ACCESS_FINE_LOCATION)) {
-                permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
-            }
+        }
+        if (!isPermissionGranted(Manifest.permission.ACCESS_FINE_LOCATION)) {
+            permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        if (!isPermissionGranted("android.permission.FOREGROUND_SERVICE_LOCATION")) {
+            permissionsToRequest.add("android.permission.FOREGROUND_SERVICE_LOCATION")
         }
 
         if (permissionsToRequest.isNotEmpty()) {
             ActivityCompat.requestPermissions(this, permissionsToRequest.toTypedArray(), PERMISSION_REQUEST_CODE)
         } else {
             enableBluetooth(result)
+            callback?.invoke()
         }
     }
 
-    /**
-     * Checks if a given permission is granted.
-     */
     private fun isPermissionGranted(permission: String): Boolean {
         return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
     }
 
-    /**
-     * Enables Bluetooth, requesting user permission if required.
-     */
     private fun enableBluetooth(result: MethodChannel.Result?) {
         val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         val bluetoothAdapter: BluetoothAdapter? = bluetoothManager.adapter
@@ -94,11 +89,9 @@ class MainActivity : FlutterActivity() {
 
         if (!bluetoothAdapter.isEnabled) {
             if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) {
-                // Directly enable Bluetooth on Android 11 and below (not recommended)
                 bluetoothAdapter.enable()
                 result?.success(null)
             } else {
-                // Android 12+ requires user interaction
                 val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
                 startActivityForResult(enableBtIntent, ENABLE_BLUETOOTH_REQUEST_CODE)
             }
@@ -107,9 +100,6 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    /**
-     * Checks if location services are enabled.
-     */
     private fun checkLocationServices(result: MethodChannel.Result) {
         val locationMode: Int
         try {
@@ -118,13 +108,9 @@ class MainActivity : FlutterActivity() {
             result.error("ERROR", "Failed to check location services: ${e.message}", null)
             return
         }
-
         result.success(locationMode != Settings.Secure.LOCATION_MODE_OFF)
     }
 
-    /**
-     * Handles the result of enabling Bluetooth.
-     */
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == ENABLE_BLUETOOTH_REQUEST_CODE) {
@@ -136,24 +122,27 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    /**
-     * Handles the result of permission requests.
-     */
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
                 sendFlutterMessage("onPermissionsGranted")
+                enableBluetooth(object : MethodChannel.Result {
+                    override fun success(result: Any?) {
+                        startForegroundService() // Start after Bluetooth is enabled
+                    }
+                    override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) {
+                        Toast.makeText(this@MainActivity, "Bluetooth not enabled", Toast.LENGTH_LONG).show()
+                    }
+                    override fun notImplemented() {}
+                })
             } else {
                 sendFlutterMessage("onPermissionsDenied")
-                Toast.makeText(this, "Permissions denied. Some features may not work.", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Permissions denied. App functionality limited.", Toast.LENGTH_LONG).show()
             }
         }
     }
 
-    /**
-     * Sends a message to Flutter via MethodChannel.
-     */
     private fun sendFlutterMessage(method: String) {
         flutterEngine?.dartExecutor?.binaryMessenger?.let {
             MethodChannel(it, CHANNEL).invokeMethod(method, null)

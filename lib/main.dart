@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:track_tag/screens/device_status_page.dart';
 import 'package:track_tag/screens/auth/login_page.dart';
 import 'package:track_tag/utils/firestore_helper.dart';
@@ -16,18 +17,22 @@ import 'package:track_tag/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   final notificationService = NotificationService();
   final deviceTrackingService = DeviceTrackingService(notificationService, navigatorKey);
   final bluetoothService = BluetoothService(navigatorKey);
 
+  // Initialize but don’t start yet
   await initializeBackgroundService(notificationService, bluetoothService, deviceTrackingService, navigatorKey);
 
   runApp(MyAppState(navigatorKey: navigatorKey));
+}
+
+// Call this after user interaction (e.g., button press or permission grant)
+void startBackgroundService() {
+  FlutterBackgroundService().startService();
 }
 
 class MyAppState extends StatefulWidget {
