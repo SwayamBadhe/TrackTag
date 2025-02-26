@@ -7,6 +7,7 @@ import 'package:track_tag/screens/device_info_card.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:track_tag/services/device_tracking_service.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ScanDevicePage extends StatefulWidget {
   const ScanDevicePage({super.key});
@@ -21,6 +22,8 @@ class ScanDevicePageState extends State<ScanDevicePage> {
   bool _isScanning = false;
   bool _isConnecting = false;
   late BluetoothService? _bluetoothService;
+  bool _isFlashOn = false;
+  final MobileScannerController _scannerController = MobileScannerController();
 
   @override
   void initState() {
@@ -45,9 +48,13 @@ class ScanDevicePageState extends State<ScanDevicePage> {
   }
 
   Future<void> _startScanning() async {
-    final trackingService = Provider.of<DeviceTrackingService>(context, listen: false);
-    if (_bluetoothService?.flutterReactiveBle.status == BleStatus.ready) {
-      _bluetoothService?.stopScan();
+    final bluetoothService =
+        Provider.of<BluetoothService>(context, listen: false);
+    final trackingService =
+        Provider.of<DeviceTrackingService>(context, listen: false);
+
+    if (bluetoothService.flutterReactiveBle.status == BleStatus.ready) {
+      bluetoothService.stopScan();
       await Future.delayed(const Duration(milliseconds: 500));
       try {
         _bluetoothService?.startScan(trackingService, isForScanAll: true);
@@ -77,21 +84,31 @@ class ScanDevicePageState extends State<ScanDevicePage> {
       appBar: AppBar(title: const Text('Scan Device')),
       body: Column(
         children: [
-          TextFormField(
-            controller: _deviceIdController,
-            decoration: const InputDecoration(labelText: 'Enter Device ID'),
+          Padding(
+            padding: const EdgeInsets.all(
+                12.0), // Adds margin around the TextFormField
+            child: TextFormField(
+              controller: _deviceIdController,
+              decoration: const InputDecoration(
+                labelText: 'Enter Device ID',
+                border:
+                    OutlineInputBorder(), // Adds a box around the text field
+                contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12.0,
+                    vertical: 10.0), // Adds padding inside the text field
+              ),
+            ),
           ),
-          ElevatedButton(
-            onPressed: _showScanner,
-            child: const Text('Scan QR Code'),
-          ),
-          ElevatedButton(
-            onPressed: () => _submitDeviceId(bluetoothService),
-            child: _isConnecting
-                ? const CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  )
-                : const Text('Register Device'),
+          Padding(
+            padding:
+                const EdgeInsets.all(12.0), // Adds margin around the button
+            child: SizedBox(
+              width: double.infinity, // Makes the button full-width
+              child: ElevatedButton(
+                onPressed: _showScanner,
+                child: const Text('Scan QR Code'),
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
@@ -119,19 +136,22 @@ class ScanDevicePageState extends State<ScanDevicePage> {
 
                 if (devices.isEmpty) {
                   return const Center(
-                    child: Text('No Bluetooth devices found',
+                    child: Text(
+                      'No Bluetooth devices found',
                       style: TextStyle(fontSize: 16, color: Colors.grey),
                     ),
                   );
                 }
-                
-                final sortedDevices = List<DiscoveredDevice>.from(devices)..sort((a, b) => b.rssi.compareTo(a.rssi));
+
+                final sortedDevices = List<DiscoveredDevice>.from(devices)
+                  ..sort((a, b) => b.rssi.compareTo(a.rssi));
 
                 return ListView.builder(
                   itemCount: sortedDevices.length,
                   itemBuilder: (context, index) {
                     final device = sortedDevices[index];
-                    final isLost = trackingService.isDeviceInLostMode(device.id);
+                    final isLost =
+                        trackingService.isDeviceInLostMode(device.id);
                     return DeviceInfoCard(
                       key: ValueKey(device.id),
                       device: device,
@@ -141,7 +161,9 @@ class ScanDevicePageState extends State<ScanDevicePage> {
                           _deviceIdController.text = deviceId;
                         });
                       },
-                      trailing: isLost ? const Icon(Icons.warning, color: Colors.orange) : null,
+                      trailing: isLost
+                          ? const Icon(Icons.warning, color: Colors.orange)
+                          : null,
                     );
                   },
                 );
@@ -150,21 +172,99 @@ class ScanDevicePageState extends State<ScanDevicePage> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _submitDeviceId(bluetoothService),
+        label: _isConnecting
+            ? const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              )
+            : const Text('Register Device'),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
   void _showScanner() {
     Navigator.of(context).push(MaterialPageRoute(
-      builder: (context) => MobileScanner(
-        onDetect: (BarcodeCapture barcodeCapture) {
-          setState(() {
-            _scannedData = barcodeCapture.barcodes.first.rawValue;
-            _deviceIdController.text = _scannedData ?? '';
-          });
-          Navigator.of(context).pop();
-        },
+      builder: (context) => Scaffold(
+        appBar: AppBar(title: const Text('QR Scanner')),
+        body: Stack(
+          children: [
+            MobileScanner(
+              controller: _scannerController,
+              onDetect: (BarcodeCapture barcodeCapture) {
+                setState(() {
+                  _scannedData = barcodeCapture.barcodes.first.rawValue;
+                  _deviceIdController.text = _scannedData ?? '';
+                });
+                Navigator.of(context).pop();
+              },
+            ),
+            // Center(
+            //   child: Container(
+            //     width: 200,
+            //     height: 200,
+            //     decoration: BoxDecoration(
+            //       border: Border.all(color: Colors.blue, width: 4),
+            //     ),
+            //   ),
+            // ),
+            Center(
+              child: Container(
+                width: 250, // Adjust size as needed
+                height: 250,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.blue, width: 3),
+                  borderRadius: BorderRadius.circular(
+                      20), // Rounded edges like Google Lens
+                  color: Colors.transparent, // Transparent inside
+                ),
+              ),
+            ),
+            Positioned(
+              top: MediaQuery.of(context).size.height * 0.5 -
+                  28, // Adjust positioning accordingly
+              right: 10,
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: 40, // Set desired width
+                    height: 40, // Set desired height
+                    child: FloatingActionButton(
+                      onPressed: () {
+                        setState(() {
+                          _isFlashOn = !_isFlashOn;
+                        });
+                        _scannerController.toggleTorch();
+                      },
+                      child: Icon(_isFlashOn ? Icons.flash_on : Icons.flash_off,
+                          size: 20), // Adjust icon size if needed
+                    ),
+                  ),
+                  const SizedBox(height: 10), // Space between buttons
+                  SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: FloatingActionButton(
+                      onPressed: _pickQRImage,
+                      child: const Icon(Icons.image, size: 20),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          ],
+        ),
       ),
     ));
+  }
+
+  Future<void> _pickQRImage() async {
+    final pickedFile =
+        await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      // Handle QR code image processing here
+    }
   }
 
   Future<void> _submitDeviceId(BluetoothService bluetoothService) async {
